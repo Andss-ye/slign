@@ -1,0 +1,12 @@
+.DS_Store
+.playwright-mcp/
+node_modules/
+
+# Notas de desarrollo: no se publican
+DECISIONS.md
+odd/
+CLAUDE.local.md
+
+# Generado en local
+preview/
+skills/slign-workspace/
