@@ -1,0 +1,33 @@
+{
+  "skill_name": "slign",
+  "evals": [
+    {
+      "id": 1,
+      "name": "explicit-router",
+      "prompt": "Draw a wifi router in Slign style and save it as router.svg in this folder.",
+      "expected_output": "router.svg: a single-ink isometric router with a face and its own hover gesture.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "implicit-empty-state",
+      "prompt": "This is the alerts page of Pingboard, my uptime monitor. The empty state looks dead. Add a small illustration above the text so it feels friendlier, something that fits a monitoring tool.",
+      "expected_output": "index.html with an inline illustration in the empty state that takes the text color and reacts on hover.",
+      "files": ["evals/fixtures/plain/index.html"]
+    },
+    {
+      "id": 3,
+      "name": "implicit-next-404",
+      "prompt": "our 404 is super boring. can you add some kind of little drawing to it? we're a deploy tool so maybe something on that theme. keep it light, no new dependencies",
+      "expected_output": "app/not-found.tsx with an inline SVG as valid JSX, no client directive, no new dependency.",
+      "files": ["evals/fixtures/next/package.json", "evals/fixtures/next/app/not-found.tsx"]
+    },
+    {
+      "id": 4,
+      "name": "restyle-and-trigger",
+      "prompt": "Add an illustration of a database to index.html inside a card. It should be green (#1f9d55), about 120px wide, and it should animate when I hover anywhere on the card, not just on the drawing.",
+      "expected_output": "index.html with a card that carries data-slign-trigger, an inline database drawing colored through CSS and sized to about 120px.",
+      "files": ["evals/fixtures/plain/index.html"]
+    }
+  ]
+}

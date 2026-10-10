@@ -1,0 +1,22 @@
+[
+  {"query": "the empty state on our dashboard is just grey text, can you put a little illustration there? it's a log viewer so something that fits", "should_trigger": true},
+  {"query": "I'm building the landing for Quillbase (a hosted postgres thing) in app/page.tsx and the hero needs a visual on the right side. no stock photos please, something drawn", "should_trigger": true},
+  {"query": "make me an svg of a server rack that I can drop into my README, ideally it does something when you hover it", "should_trigger": true},
+  {"query": "our 404 page in src/pages/404.astro is boring, add some kind of cute drawing to it", "should_trigger": true},
+  {"query": "need a mascot-ish object for the onboarding step where the user connects their repo. keep it lightweight, no lottie, no js", "should_trigger": true},
+  {"query": "draw a slign-style cloud for the pricing section", "should_trigger": true},
+  {"query": "the features section has three cards (deploys, logs, alerts) and they're all text. add a small animated illustration to each one that plays when you hover the card", "should_trigger": true},
+  {"query": "can you make the laptop drawing on the homepage green and a bit thicker? it's the inline svg in Hero.vue", "should_trigger": true},
+  {"query": "i want a loading screen for my cli's web dashboard with a little drawing of a rocket or something, isometric would be cool", "should_trigger": true},
+  {"query": "add a decorative illustration of a database to the docs intro page, single color so it matches whatever theme the reader has", "should_trigger": true},
+  {"query": "add a chevron-down icon to the dropdown button in Select.tsx, 16px, same stroke as the other icons", "should_trigger": false},
+  {"query": "we need a logo for Quillbase. wordmark plus a simple mark, should work at favicon size", "should_trigger": false},
+  {"query": "plot the p95 latency from metrics.csv as an svg line chart with a tooltip on hover", "should_trigger": false},
+  {"query": "draw an architecture diagram of our system: api gateway, three services, postgres and a redis cache, with arrows between them", "should_trigger": false},
+  {"query": "optimize all the svgs in public/icons with svgo and inline the small ones", "should_trigger": false},
+  {"query": "the hero illustration is a 2mb png, convert it to webp and add proper srcset", "should_trigger": false},
+  {"query": "generate a photorealistic image of a data center for the about page", "should_trigger": false},
+  {"query": "replace our heroicons with lucide across the app and make sure the sizes stay the same", "should_trigger": false},
+  {"query": "animate the hamburger menu icon so it morphs into an X when the nav opens", "should_trigger": false},
+  {"query": "write a css keyframe animation that makes the pricing cards fade up as they scroll into view", "should_trigger": false}
+]
