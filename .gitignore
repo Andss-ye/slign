@@ -2,11 +2,11 @@
 .playwright-mcp/
 node_modules/
 
-# Notas de desarrollo: no se publican
+# Local working notes
 DECISIONS.md
 odd/
 CLAUDE.local.md
 
-# Generado en local
+# Generated locally
 preview/
 skills/slign-workspace/
