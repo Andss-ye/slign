@@ -32,6 +32,21 @@ export const css = ({ hinge, origin }) =>
 
 See `examples/laptop.mjs`.
 
+## Swing or spin
+
+A bell, a pendulum, a dial, a fan. Use a plain `rotate()` and put the pivot where
+the part hangs or turns. `origin` works here exactly as it does for a hinge.
+
+```js
+export const css = ({ origin }) =>
+  `ROOT .sl-bell{transform-box:view-box;transform-origin:${origin([0, 0, 60])};transition:transform .5s cubic-bezier(.34,1.56,.64,1)}` +
+  'ACTIVE .sl-bell{transform:rotate(-12deg)}';
+```
+
+For a swing that keeps going, animate between two angles instead:
+`@keyframes slign-bell-swing{from{transform:rotate(-10deg)}to{transform:rotate(10deg)}}`
+with `animation: … ease-in-out infinite alternate`.
+
 ## Lift with a bounce
 
 A part jumps and settles. The spring curve overshoots, which is what makes it feel

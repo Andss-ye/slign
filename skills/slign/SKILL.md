@@ -25,19 +25,23 @@ stays consistent when the pen draws it.
   edge would be behind something, leave it out, or the object turns into a
   wireframe.
 - **Show thickness.** A panel is two outlines a few units apart, joined at the
-  visible corners. A flat shape with no edge reads as a mistake.
-- **Texture is dots and scribbles**, never hatching or gray.
+  visible corners. A flat shape with no edge reads as a mistake. Rod-like parts
+  such as an antenna, a cable or a stem are the exception: one stroke is enough.
+- **Texture is dots and scribbles**, never hatching or tone. A part may rest at a
+  lower opacity when that means something, like a light that is off.
 - **A face.** Two short vertical strokes for eyes, placed where a viewer looks
   first. They blink on their own. Leave the face out only when it hurts the
   drawing.
 - **One gesture.** On hover the object does something that fits what it is: a
-  laptop lid closes a little, a database disc jumps. Do not reuse another
-  object's gesture.
+  laptop lid closes a little, a database disc jumps. The mechanism can repeat
+  between objects, since there are only so many; what must be its own is the
+  meaning. A bell swings, a router's signal pulses.
 
 ## How to make one
 
 1. **Pick the closest example** in `examples/` and read its `.mjs`. Each one is
-   short and teaches one kind of shape and one kind of gesture.
+   short and teaches one kind of shape and one kind of gesture. If the request
+   is exactly one of these objects, use its `.svg` as it is and skip to step 5.
 
    | Example | Shape it teaches | Gesture it teaches |
    |---|---|---|
@@ -75,8 +79,12 @@ stays consistent when the pen draws it.
    stop the output and say what to fix. Warnings are worth reading: no face, no
    gesture, or too heavy.
 
-4. **Look at the result.** Open the SVG or render it if you can. Check it against
-   the list at the end of this file and adjust coordinates until it passes.
+4. **Look at the result.** A drawing made of coordinates is easy to get wrong
+   without seeing it, so render it if you have any way to: a browser or
+   screenshot tool, or an image converter on the machine. On its own the file
+   draws in black on a transparent background. Check it against the list at the
+   end of this file and adjust coordinates until it passes. If you cannot render
+   it, say so when you hand it over.
 
 5. **Put it in the project**, inline. See "Using the SVG" below.
 
@@ -90,6 +98,8 @@ The canvas is 200 by 200. Points are `[x, y, z]`:
 - Keep objects within about 45 units of the origin on `x` and `y`, and under 100
   on `z`. Use `oy` (default 131) to move the whole drawing up or down so it sits
   centered.
+- A round upright shape, such as a cylinder, a cone or a bell, has its left and
+  right outline at 135 and -45 degrees around its axis. Join the rings there.
 
 ## The pen
 
@@ -97,8 +107,8 @@ The canvas is 200 by 200. Points are `[x, y, z]`:
 |---|---|
 | `pen.line(points, { closed, thin })` | Straight-ish strokes with sharp corners. Use for boxes and edges. |
 | `pen.curve(points, { closed, thin })` | One smooth stroke through three or more points. Use for organic shapes. |
-| `pen.ring([cx, cy, z], r, { from, to, thin })` | A horizontal circle, or an arc in degrees. The visible front of a cylinder is `from: -45, to: 135`. |
-| `pen.dot([x, y, z])` | A dot of ink: a key, a light, a rivet. |
+| `pen.ring([cx, cy, z], r, { from, to, plane, thin })` | A circle, or an arc in degrees. Flat on the ground by default; the visible front of a cylinder is `from: -45, to: 135`. With `plane: 'xz'` or `'yz'` it stands upright, for a dial, a wheel or a signal arc. |
+| `pen.dot([x, y, z])` | A dot of ink: a key, a light, a rivet. For a solid part bigger than a dot, draw a small closed `curve`. |
 | `pen.eye([x, y, z], height)` | One eye. Draw two, about 14 units apart. |
 | `pen.group(name, markup)` | Wraps parts in `<g class="sl-name">` so the gesture can move them. |
 
@@ -123,11 +133,13 @@ recipe for each kind of gesture.
 Paste the SVG **inline** in the page. Through `<img>` it loses its color and its
 hover gesture.
 
-- **Color and weight** come from CSS on the SVG or any parent:
-  `color: #2a17d4; --slign-stroke: 3;`
+- **Color and weight** come from CSS: `color: #2a17d4; --slign-stroke: 3;`. Left
+  alone, the drawing takes the color of the text around it, which is usually
+  right. To tint only the drawing, put `color` on the `<svg>` itself.
 - **Size**: set `width` and `height` on the `<svg>`, or size it with CSS.
-- **Trigger from a parent**: add `data-slign-trigger` to a card or button and the
-  gesture plays when that element is hovered.
+- **Trigger from a parent**: add the bare attribute `data-slign-trigger` to a
+  card or button, `<div class="card" data-slign-trigger>`, and the gesture plays
+  when any part of that element is hovered.
 - **React and JSX**: rename `class` to `className`, `stroke-linecap` to
   `strokeLinecap` and `stroke-linejoin` to `strokeLinejoin`, and wrap the content
   of `<style>` in a template string: ``<style>{`…`}</style>``. It needs no client

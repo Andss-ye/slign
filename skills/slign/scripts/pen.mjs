@@ -64,13 +64,17 @@ export function createPen(seed, oy = 131) {
     return `<path class="${cls('sl-l', o)}" d="${d}"/>`;
   };
 
-  /** Horizontal circle or arc. 0 degrees points along +x, 90 along +y. */
+  /**
+   * Circle or arc. Horizontal by default: 0 degrees points along +x, 90 along +y.
+   * With plane 'xz' or 'yz' it stands upright: 0 points along x or y, 90 points up.
+   */
   const ring = ([cx, cy, z], r, o = {}) => {
     const from = o.from ?? 0, to = o.to ?? 360, full = to - from >= 360;
     const steps = Math.max(3, Math.ceil((to - from) / 30)), pts = [];
     for (let i = 0; i < (full ? steps : steps + 1); i++) {
       const a = ((from + ((to - from) * i) / steps) * Math.PI) / 180;
-      pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a), z]);
+      const u = r * Math.cos(a), v = r * Math.sin(a);
+      pts.push(o.plane === 'xz' ? [cx + u, cy, z + v] : o.plane === 'yz' ? [cx, cy + u, z + v] : [cx + u, cy + v, z]);
     }
     return curve(pts, { ...o, closed: full });
   };

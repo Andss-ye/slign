@@ -64,3 +64,11 @@ test('pen methods work when destructured', () => {
   assert.ok(ring([0, 0, 0], 10).startsWith('<path'));
   assert.ok(eye([0, 0, 0]).startsWith('<path'));
 });
+
+test('an upright ring rises instead of spreading on the ground', () => {
+  const ys = (d) => [...d.matchAll(/[MQ ]-?[\d.]+ (-?[\d.]+)/g)].map((m) => +m[1]);
+  const spread = (d) => Math.max(...ys(d)) - Math.min(...ys(d));
+  const flat = createPen(7).ring([0, 0, 0], 20);
+  assert.ok(spread(createPen(7).ring([0, 0, 0], 20, { plane: 'xz' })) > spread(flat));
+  assert.ok(spread(createPen(7).ring([0, 0, 0], 20, { plane: 'yz' })) > spread(flat));
+});
