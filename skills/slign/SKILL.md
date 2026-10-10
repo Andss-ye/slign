@@ -35,7 +35,8 @@ stays consistent when the pen draws it.
 - **One gesture.** On hover the object does something that fits what it is: a
   laptop lid closes a little, a database disc jumps. The mechanism can repeat
   between objects, since there are only so many; what must be its own is the
-  meaning. A bell swings, a router's signal pulses.
+  meaning. A bell swings, a router's signal pulses. One gesture is one idea, and
+  it may move several parts: a rocket lifts and leaves smoke behind.
 
 ## How to make one
 
@@ -85,6 +86,10 @@ stays consistent when the pen draws it.
    draws in black on a transparent background. Check it against the list at the
    end of this file and adjust coordinates until it passes. If you cannot render
    it, say so when you hand it over.
+
+   To see the gesture without a mouse, add the class `slign-active` to the
+   `<svg>`: it holds the object in its hovered state. Put a resting copy and an
+   active copy side by side in a scratch HTML file and screenshot that.
 
 5. **Put it in the project**, inline. See "Using the SVG" below.
 
@@ -140,9 +145,11 @@ hover gesture.
 - **Trigger from a parent**: add the bare attribute `data-slign-trigger` to a
   card or button, `<div class="card" data-slign-trigger>`, and the gesture plays
   when any part of that element is hovered.
+- **Trigger from code**: the class `slign-active` on the `<svg>` plays the
+  gesture too, for scroll, click or state changes.
 - **React and JSX**: rename `class` to `className`, `stroke-linecap` to
-  `strokeLinecap` and `stroke-linejoin` to `strokeLinejoin`, and wrap the content
-  of `<style>` in a template string: ``<style>{`…`}</style>``. It needs no client
+  `strokeLinecap` and `stroke-linejoin` to `strokeLinejoin`, drop `xmlns`, and
+  wrap the content of `<style>` in a template string: ``<style>{`…`}</style>``. It needs no client
   code, so it works in a server component.
 - **Vue, Svelte, Astro**: paste it as is.
 

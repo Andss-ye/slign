@@ -43,7 +43,7 @@ test('ROOT and ACTIVE expand to the object scope', () => {
   const svg = render(box());
   assert.ok(!/\bROOT\b|\bACTIVE\b/.test(svg));
   assert.ok(svg.includes('.slign-box .sl-lid{transition'));
-  assert.ok(svg.includes(':is(.slign-box:hover,.slign-box:focus-visible,[data-slign-trigger]:hover .slign-box) .sl-lid{transform'));
+  assert.ok(svg.includes(':is(.slign-box:hover,.slign-box:focus-visible,.slign-box.slign-active,[data-slign-trigger]:hover .slign-box) .sl-lid{transform'));
 });
 
 test('css can be a function that receives hinge and origin', () => {

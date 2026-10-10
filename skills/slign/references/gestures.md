@@ -30,7 +30,27 @@ export const css = ({ hinge, origin }) =>
   standing up, `[0, 0, 1]`.
 - `deg` is the angle. Try both signs and keep the one that turns the right way.
 
+Two things to expect:
+
+- A part that stands up reads clearly after a small turn, 10 to 20 degrees. A
+  part that lies flat, like the lid of a box, looks edge-on at small angles and
+  only reads as open past about 100 degrees. Render it to choose.
+- The matrix treats the part as flat. A few units of thickness survive the turn;
+  a thick slab skews. Keep hinged parts thin.
+
 See `examples/laptop.mjs`.
+
+## Edges that only show during the gesture
+
+Opening a lid or lifting a part can reveal edges that are hidden at rest, such as
+the inside of a box. Draw them in their own group, hide it at rest and show it
+while active:
+
+```js
+export const css =
+  'ROOT .sl-inside{opacity:0;transition:opacity .2s}' +
+  'ACTIVE .sl-inside{opacity:1}';
+```
 
 ## Swing or spin
 

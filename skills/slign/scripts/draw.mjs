@@ -8,8 +8,8 @@ import { createPen, hinge, project } from './pen.mjs';
 const LIMIT = 8192;
 const KEYFRAMES = /@keyframes\s+([\w-]+)\s*\{((?:[^{}]*\{[^{}]*\})*)\s*\}/g;
 
-/** "Active" means hovered, focused, or inside a hovered [data-slign-trigger] ancestor. */
-const active = (sel) => `:is(${sel}:hover,${sel}:focus-visible,[data-slign-trigger]:hover ${sel})`;
+/** "Active" means hovered, focused, inside a hovered [data-slign-trigger] ancestor, or carrying .slign-active. */
+const active = (sel) => `:is(${sel}:hover,${sel}:focus-visible,${sel}.slign-active,[data-slign-trigger]:hover ${sel})`;
 
 const BASE =
   '.slign{--_w:var(--slign-stroke,3)}' +

@@ -7,7 +7,9 @@ const walk = (dir) => readdirSync(dir).flatMap((f) => {
   return statSync(p).isDirectory() ? (f === 'node_modules' ? [] : walk(p)) : [p];
 });
 
-const files = walk(process.argv[2]).filter((p) => /\.(svg|html|tsx|jsx|vue|svelte|astro)$/.test(p));
+const files = walk(process.argv[2])
+  .filter((p) => /\.(svg|html|tsx|jsx|vue|svelte|astro)$/.test(p) && !p.includes('_scratch'))
+  .sort((a, b) => a.endsWith('.svg') - b.endsWith('.svg'));
 const holder = files.map((p) => ({ p, text: readFileSync(p, 'utf8') })).find(({ text }) => /<svg[\s\S]*<\/svg>/.test(text));
 const svg = holder ? holder.text.match(/<svg[\s\S]*<\/svg>/)[0] : '';
 const jsx = holder ? /\.(tsx|jsx)$/.test(holder.p) : false;
