@@ -1,0 +1,13 @@
+{
+  "name": "slign",
+  "version": "0.1.0",
+  "description": "Hand-inked isometric illustrations that come alive on hover. One ink, no fills, no JavaScript.",
+  "author": {
+    "name": "andss-ye",
+    "url": "https://github.com/andss-ye"
+  },
+  "homepage": "https://github.com/andss-ye/slign",
+  "repository": "https://github.com/andss-ye/slign",
+  "license": "MIT",
+  "keywords": ["svg", "illustration", "isometric", "animation", "skill"]
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "slign",
+  "description": "Hand-inked isometric illustrations for coding agents.",
+  "owner": {
+    "name": "andss-ye",
+    "url": "https://github.com/andss-ye"
+  },
+  "plugins": [
+    {
+      "name": "slign",
+      "description": "Teaches your agent to draw hand-inked isometric SVG illustrations with a face and a hover gesture.",
+      "source": "./",
+      "category": "design"
+    }
+  ]
+}
