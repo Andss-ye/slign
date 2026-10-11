@@ -42,7 +42,10 @@ stays consistent when the pen draws it.
 
 1. **Pick the closest example** in `examples/` and read its `.mjs`. Each one is
    short and teaches one kind of shape and one kind of gesture. If the request
-   is exactly one of these objects, use its `.svg` as it is and skip to step 5.
+   is for one of these objects and nothing more specific, use its `.svg` as it
+   is and skip to step 5. If the context asks for a twist, such as a rocket that
+   is lost for a 404 page, draw a new object: fitting the page matters more than
+   saving a step.
 
    | Example | Shape it teaches | Gesture it teaches |
    |---|---|---|
@@ -76,8 +79,9 @@ stays consistent when the pen draws it.
    node <skill-folder>/scripts/draw.mjs path/to/router.mjs
    ```
 
-   It writes `router.svg` next to the object file and prints its size. Errors
-   stop the output and say what to fix. Warnings are worth reading: no face, no
+   It writes `router.svg` next to the object file and prints its size. Pass a
+   second path to write it elsewhere, and `--jsx` to also get a `.jsx` version
+   for React. Errors stop the output and say what to fix. Warnings are worth reading: no face, no
    gesture, or too heavy.
 
 4. **Look at the result.** A drawing made of coordinates is easy to get wrong
@@ -87,9 +91,11 @@ stays consistent when the pen draws it.
    end of this file and adjust coordinates until it passes. If you cannot render
    it, say so when you hand it over.
 
-   To see the gesture without a mouse, add the class `slign-active` to the
-   `<svg>`: it holds the object in its hovered state. Put a resting copy and an
-   active copy side by side in a scratch HTML file and screenshot that.
+   To see the gesture without a mouse, add `slign-active` to the class list the
+   `<svg>` already has: it holds the object in its hovered state. Put a resting
+   copy and an active copy side by side in a scratch HTML file and screenshot
+   that. This shows where a transition ends; for a looping animation it shows
+   only the first frame, so read the keyframes to check those.
 
 5. **Put it in the project**, inline. See "Using the SVG" below.
 
@@ -105,6 +111,11 @@ The canvas is 200 by 200. Points are `[x, y, z]`:
   centered.
 - A round upright shape, such as a cylinder, a cone or a bell, has its left and
   right outline at 135 and -45 degrees around its axis. Join the rings there.
+- Nothing faces the viewer head-on. A circle or arc standing upright leans with
+  the projection, like everything else in the drawing. That is the style, so do
+  not correct it.
+- A thin part that passes in front of an edge should clearly cross it. If its
+  tip lands on the edge it looks glued there; move it or make it longer.
 
 ## The pen
 
@@ -141,16 +152,20 @@ hover gesture.
 - **Color and weight** come from CSS: `color: #2a17d4; --slign-stroke: 3;`. Left
   alone, the drawing takes the color of the text around it, which is usually
   right. To tint only the drawing, put `color` on the `<svg>` itself.
-- **Size**: set `width` and `height` on the `<svg>`, or size it with CSS.
+- **Size**: set `width` and `height` on the `<svg>`, or size it with CSS. The
+  drawing fills roughly the middle half of its square, so it looks smaller than
+  the number: 120 to 160px suits an empty state, 200px or more a hero.
 - **Trigger from a parent**: add the bare attribute `data-slign-trigger` to a
   card or button, `<div class="card" data-slign-trigger>`, and the gesture plays
   when any part of that element is hovered.
 - **Trigger from code**: the class `slign-active` on the `<svg>` plays the
   gesture too, for scroll, click or state changes.
-- **React and JSX**: rename `class` to `className`, `stroke-linecap` to
-  `strokeLinecap` and `stroke-linejoin` to `strokeLinejoin`, drop `xmlns`, and
-  wrap the content of `<style>` in a template string: ``<style>{`…`}</style>``. It needs no client
-  code, so it works in a server component.
+- **React and JSX**: run `draw.mjs` with `--jsx` and paste the `.jsx` it writes.
+  For an example used as is, convert by hand: rename `class` to `className`,
+  `stroke-linecap` to `strokeLinecap` and `stroke-linejoin` to `strokeLinejoin`,
+  drop `xmlns`, and wrap the content of `<style>` in a template string:
+  ``<style>{`…`}</style>``. It needs no client code, so it works in a server
+  component.
 - **Vue, Svelte, Astro**: paste it as is.
 
 Keep the `.mjs` only if the project has a place for design sources. The SVG is

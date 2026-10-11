@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Turns an object file into a self-contained Slign SVG: node draw.mjs <object.mjs> [out.svg]
+// Turns an object file into a self-contained Slign SVG: node draw.mjs <object.mjs> [out.svg] [--jsx]
 import { realpathSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -75,9 +75,20 @@ export function check(o) {
   return { errors, warnings, svg };
 }
 
-async function main([src, out]) {
+/** The same drawing as a JSX element, ready to paste into a React component. */
+export function toJsx(svg) {
+  return svg
+    .replace(' xmlns="http://www.w3.org/2000/svg"', '')
+    .replace(/class=/g, 'className=')
+    .replace(/stroke-line(cap|join)=/g, 'strokeLine$1=')
+    .replace(/<style>(.*?)<\/style>/s, '<style>{`$1`}</style>');
+}
+
+async function main(args) {
+  const jsx = args.includes('--jsx');
+  const [src, out] = args.filter((a) => a !== '--jsx');
   if (!src) {
-    console.error('usage: node draw.mjs <object.mjs> [out.svg]');
+    console.error('usage: node draw.mjs <object.mjs> [out.svg] [--jsx]');
     return 2;
   }
   let o;
@@ -94,6 +105,11 @@ async function main([src, out]) {
   const file = out ? resolve(out) : resolve(dirname(src), `${o.name}.svg`);
   writeFileSync(file, svg + '\n');
   console.log(`${file}  ${(Buffer.byteLength(svg) / 1024).toFixed(1)} KB`);
+  if (jsx) {
+    const jsxFile = file.replace(/\.svg$/, '') + '.jsx';
+    writeFileSync(jsxFile, toJsx(svg) + '\n');
+    console.log(jsxFile);
+  }
   return 0;
 }
 

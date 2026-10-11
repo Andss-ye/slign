@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { check, render } from '../skills/slign/scripts/draw.mjs';
+import { check, render, toJsx } from '../skills/slign/scripts/draw.mjs';
 
 const DRAW = fileURLToPath(new URL('../skills/slign/scripts/draw.mjs', import.meta.url));
 const SPRING = 'cubic-bezier(.34,1.56,.64,1)';
@@ -115,6 +115,20 @@ test('the CLI fails clearly and writes nothing for a broken object', () => {
   assert.equal(empty.status, 1);
   assert.match(empty.stderr, /label:/);
   assert.ok(!existsSync(join(dir, 'empty.svg')));
+});
+
+test('toJsx renames attributes and wraps the style in a template string', () => {
+  const jsx = toJsx(render(box()));
+  assert.ok(jsx.startsWith('<svg viewBox="0 0 200 200" className="slign slign-box"'));
+  assert.ok(!/\sclass=|stroke-linecap=|stroke-linejoin=|xmlns=/.test(jsx));
+  assert.ok(jsx.includes('strokeLinecap="round"') && jsx.includes('<style>{`.slign{') && jsx.includes('`}</style>'));
+});
+
+test('the CLI writes a .jsx file next to the svg when asked', () => {
+  const dir = project({ 'box.mjs': SOURCE });
+  const run = spawnSync('node', [DRAW, 'box.mjs', '--jsx'], { cwd: dir, encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  assert.ok(readFileSync(join(dir, 'box.jsx'), 'utf8').includes('className="slign slign-box"'));
 });
 
 test('the CLI asks for an argument when there is none', () => {
