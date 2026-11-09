@@ -1,6 +1,6 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -10,6 +10,7 @@ import { profileOf } from '../skills/slign/scripts/sense.mjs';
 
 const SENSE = fileURLToPath(new URL('../skills/slign/scripts/sense.mjs', import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), 'slign-sense-test-'));
+after(() => rmSync(dir, { recursive: true, force: true }));
 
 const LIGHT = `<!doctype html><meta charset=utf-8><style>
 body{margin:0;background:#f5efe0;color:#2b2118;font:18px Georgia,serif}

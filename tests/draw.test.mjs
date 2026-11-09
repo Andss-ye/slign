@@ -1,7 +1,7 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,8 +24,13 @@ export const draw = (pen) => pen.line([[0, 0, 0], [10, 0, 0]]) + pen.eye([2, 0, 
 export const css = 'ACTIVE .sl-l{transform:translateY(-2px)}';
 `;
 
+const roots = [];
+after(() => roots.forEach((r) => rmSync(r, { recursive: true, force: true })));
+
 function project(files) {
-  const dir = join(mkdtempSync(join(tmpdir(), 'slign ')), 'my objects');
+  const root = mkdtempSync(join(tmpdir(), 'slign '));
+  roots.push(root);
+  const dir = join(root, 'my objects');
   mkdirSync(dir);
   for (const [file, text] of Object.entries(files)) writeFileSync(join(dir, file), text);
   return dir;

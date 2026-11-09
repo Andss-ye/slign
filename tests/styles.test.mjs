@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -227,8 +227,9 @@ test('the sample objects follow the style and stay under the size budget', async
   }
 });
 
-test('the CLI draws the new styles and --swift is ink only', () => {
+test('the CLI draws the new styles and --swift is ink only', (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'slign-styles '));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
   writeFileSync(join(dir, 'wire.mjs'), `export const name = 'wire';\nexport const label = 'Wire';\nexport const style = 'hairline';\nexport const draw = (pen) => pen.line([[0, 0, 0], [20, 0, 0], [20, 20, 0]]);\nexport const css = 'ACTIVE .sl-l{opacity:.5}';\n`);
   const ok = spawnSync('node', [DRAW, 'wire.mjs'], { cwd: dir, encoding: 'utf8' });
   assert.equal(ok.status, 0, ok.stderr);
