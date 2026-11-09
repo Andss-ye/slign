@@ -2,21 +2,24 @@
 import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { check } from './skills/slign/scripts/draw.mjs';
 
-const dir = new URL('skills/slign/examples/', import.meta.url);
 const figures = [];
 
-for (const file of readdirSync(dir).filter((f) => f.endsWith('.mjs')).sort()) {
-  const o = await import(new URL(file, dir));
-  const { errors, warnings, svg } = check(o);
-  for (const w of warnings) console.error(`${file}  warning  ${w}`);
-  if (errors.length) {
-    console.error(`${file}\n  ${errors.join('\n  ')}`);
-    process.exit(1);
+// Icons share names with illustrations (bell), so only the illustrations go in the preview.
+for (const [folder, preview] of [['skills/slign/examples/', true], ['skills/slign/examples/icons/', false]]) {
+  const dir = new URL(folder, import.meta.url);
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.mjs')).sort()) {
+    const o = await import(new URL(file, dir));
+    const { errors, warnings, svg } = check(o);
+    for (const w of warnings) console.error(`${file}  warning  ${w}`);
+    if (errors.length) {
+      console.error(`${file}\n  ${errors.join('\n  ')}`);
+      process.exit(1);
+    }
+    writeFileSync(new URL(`${o.name}.svg`, dir), svg + '\n');
+    const kb = (Buffer.byteLength(svg) / 1024).toFixed(1);
+    if (preview) figures.push(`<figure>${svg}<figcaption>${o.name} · ${kb} KB</figcaption></figure>`);
+    console.log(`${o.name}  ${kb} KB`);
   }
-  writeFileSync(new URL(`${o.name}.svg`, dir), svg + '\n');
-  const kb = (Buffer.byteLength(svg) / 1024).toFixed(1);
-  figures.push(`<figure>${svg}<figcaption>${o.name} · ${kb} KB</figcaption></figure>`);
-  console.log(`${o.name}  ${kb} KB`);
 }
 
 mkdirSync(new URL('preview/', import.meta.url), { recursive: true });
