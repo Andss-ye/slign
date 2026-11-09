@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { check, render, toJsx } from '../skills/slign/scripts/draw.mjs';
+import { check, render, toJsx, toSwift } from '../skills/slign/scripts/draw.mjs';
 
 const DRAW = fileURLToPath(new URL('../skills/slign/scripts/draw.mjs', import.meta.url));
 const SPRING = 'cubic-bezier(.34,1.56,.64,1)';
@@ -193,4 +193,36 @@ test('the CLI asks for an argument when there is none', () => {
   const run = spawnSync('node', [DRAW], { encoding: 'utf8' });
   assert.equal(run.status, 2);
   assert.match(run.stderr, /usage:/);
+});
+
+test('toSwift makes a SwiftUI view that draws the first pass in one ink', () => {
+  const swift = toSwift(render(box({ name: 'coffee-mug', label: 'Coffee mug' })), 'coffee-mug');
+  assert.match(swift, /^import SwiftUI/m);
+  assert.ok(swift.includes('struct CoffeeMug: View {'));
+  assert.ok(swift.includes('var ink: Color = .primary') && swift.includes('var weight: CGFloat = 3'));
+  assert.ok(swift.includes('.accessibilityLabel("Coffee mug")'));
+  const rows = swift.match(/^ {8}\(\d, \[/gm) ?? [];
+  assert.equal(rows.length, 3, 'one row per stroke: line, eye and dot');
+});
+
+test('toSwift keeps the eye and thin weights apart from the main ink', () => {
+  const swift = toSwift(render(box({ draw: (pen) => pen.line([[0, 0, 0], [9, 0, 0]], { thin: true }) + pen.eye([2, 0, 5]) })), 'box');
+  assert.match(swift, /^ {8}\(1, \[/m);
+  assert.match(swift, /^ {8}\(2, \[/m);
+});
+
+test('the CLI writes a .swift view when asked', () => {
+  const dir = project({ 'box.mjs': SOURCE });
+  const r = spawnSync(process.execPath, [DRAW, join(dir, 'box.mjs'), join(dir, 'box.svg'), '--swift'], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(readFileSync(join(dir, 'box.swift'), 'utf8'), /struct Box: View/);
+});
+
+test('toSwift leaves out parts that are hidden at rest and only appear in the gesture', () => {
+  const o = box({
+    draw: (pen) => pen.line([[0, 0, 0], [9, 0, 0]]) + pen.group('puff', pen.ring([0, 0, 0], 4)),
+    css: 'ROOT .sl-puff{opacity:0}ACTIVE .sl-puff{opacity:1}',
+  });
+  const rows = toSwift(render(o), 'box').match(/^ {8}\(\d, \[/gm) ?? [];
+  assert.equal(rows.length, 1);
 });
