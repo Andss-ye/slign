@@ -71,6 +71,7 @@ const toUrl = (u) => (/^(https?|file|data|about):/.test(u) ? u : pathToFileURL(r
 
 /** Starts Chrome and returns { open, evaluate, screenshot, close, profile }. Always close() it. */
 export async function launch({ width = 1280, height = 900 } = {}) {
+  if (!globalThis.WebSocket) throw new Error('Node 22 or newer is required (global WebSocket)');
   const bin = findChrome();
   if (!bin) throw new Error('Chrome not found: install it or set CHROME to its path');
   const profile = mkdtempSync(join(tmpdir(), 'slign-chrome-'));

@@ -12,7 +12,7 @@ npm test
 node build.mjs     # then open preview/index.html
 ```
 
-Node 20 or newer. There are no dependencies to install.
+Node 22 or newer. There are no dependencies to install.
 
 ## Adding a reference object
 

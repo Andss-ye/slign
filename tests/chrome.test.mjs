@@ -57,6 +57,21 @@ test('stopGroup kills the group even when the main process already exited', asyn
   assert.equal(spawnSync('pgrep', ['-f', mark]).status, 1);
 });
 
+test('launch names Node 22 when WebSocket is missing', async () => {
+  const ws = globalThis.WebSocket;
+  delete globalThis.WebSocket;
+  try {
+    await assert.rejects(launch(), (e) => /Node 22/.test(e.message) && !e.message.includes('\n'));
+  } finally {
+    globalThis.WebSocket = ws;
+  }
+});
+
+test('package.json requires Node 22 or newer', () => {
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.equal(pkg.engines.node, '>=22');
+});
+
 test('stopGroup kills a process that ignores SIGTERM', async () => {
   const child = spawn('sh', ['-c', 'trap "" TERM; while :; do sleep 1; done'], { detached: true, stdio: 'ignore' });
   const exited = new Promise((r) => child.once('exit', r));

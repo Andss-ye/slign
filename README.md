@@ -40,7 +40,7 @@ npx skills add andss-ye/slign
 
 Or copy the `skills/slign` folder into your agent's skills directory.
 
-It needs Node 20 or newer and nothing else.
+It needs Node 22 or newer and nothing else.
 
 ## Use
 
