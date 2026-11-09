@@ -14,11 +14,11 @@ const CHROME = [
 ].find((p) => p && existsSync(p));
 
 /** Page that shows the drawing large, on paper or dark, optionally mid-gesture. */
-export function pageFor(svg, { dark = false, active = false, size = 560 } = {}) {
+export function pageFor(svg, { dark = false, active = false } = {}) {
   const body = active ? svg.replace('class="slign ', 'class="slign slign-active ') : svg;
   const [ink, paper] = dark ? ['#ededed', '#121214'] : ['#2a17d4', '#dedede'];
   return `<!doctype html><meta charset="utf-8"><style>html,body{margin:0;height:100%;background:${paper};color:${ink}}` +
-    `body{display:grid;place-items:center}.slign{--slign-size:${size}px}</style>${body}`;
+    `body{display:grid;place-items:center}.slign.slign{height:560px!important;width:auto!important;max-width:600px!important}</style>${body}`;
 }
 
 export function main(args) {

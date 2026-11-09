@@ -14,7 +14,7 @@ Draw the product's own noun for that slot: an empty inbox gets a mailbox, a
 quiet alerts page gets a bell.
 
 - **An example fits** (`laptop`, `server`, `database`, `cloud`, `terminal`,
-  `rocket`): use `<skill>/examples/<name>.mjs` as the object.
+  `rocket`, `phone`, `bell`): use `<skill>/examples/<name>.mjs` as the object.
 - **Otherwise**: read `<skill>/references/drawing.md` and the closest example,
   then write `<name>.mjs` in a scratch folder.
 
