@@ -1,6 +1,6 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -67,4 +67,48 @@ test('the CLI prints one JSON line and a png, and fails clearly on a missing pag
   const bad = spawnSync(process.execPath, [SENSE, join(dir, 'missing.html')], { encoding: 'utf8' });
   assert.equal(bad.status, 1);
   assert.match(bad.stderr, /^error {4}/);
+});
+
+const PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+const page = (body) => `<!doctype html><meta charset=utf-8><style>body{margin:0;background:#fff;color:#111;font:18px sans-serif}</style>${body}`;
+
+test('only real media or a covering background counts as a photo', async (t) => {
+  if (!findChrome()) return t.skip('no Chrome');
+  const strip = await sense(page(`<h1>Hi</h1><div style="width:60%;height:60px;background:url(${PIXEL})"></div>`));
+  assert.equal(strip.texture, 'flat');
+  const img = await sense(page(`<img src="${PIXEL}" style="width:60%;height:200px">`));
+  assert.equal(img.texture, 'photo');
+  const cover = await sense(page(`<div style="width:60%;height:60px;background:url(${PIXEL}) center/cover"></div>`));
+  assert.equal(cover.texture, 'photo');
+  const hero = await sense(page(`<div style="width:60%;height:60%;position:absolute;background:url(${PIXEL})"></div>`));
+  assert.equal(hero.texture, 'photo');
+});
+
+test('accent votes come from exact class tokens, not substrings', async (t) => {
+  if (!findChrome()) return t.skip('no Chrome');
+  const p = await sense(page(`<style>.tagline{background:#e11d48;color:#fff;padding:8px}.btn{background:#1a56db;color:#fff;padding:8px}</style>
+<p>Plain text that is not an accent.</p><div class=tagline>one</div><div class=tagline>two</div><div class=hot-tags>three</div><span class=btn>Go</span>`));
+  assert.equal(p.accent, '#1a56db');
+});
+
+test('the CLI writes its screenshot to the temp dir unless --out says otherwise', (t) => {
+  const cwd = mkdtempSync(join(tmpdir(), 'slign-sense-cwd-'));
+  const shot = join(tmpdir(), 'slign-sense.png');
+  t.after(() => { rmSync(cwd, { recursive: true, force: true }); rmSync(shot, { force: true }); });
+  if (!findChrome()) return t.skip('no Chrome');
+  const file = join(dir, 'default-out.html');
+  writeFileSync(file, LIGHT);
+  rmSync(shot, { force: true });
+  const r = spawnSync(process.execPath, [SENSE, file], { cwd, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(readdirSync(cwd), []);
+  assert.ok(existsSync(shot));
+});
+
+test('--out without a path fails before Chrome starts', () => {
+  for (const args of [['page.html', '--out'], ['--out', '--other', 'page.html']]) {
+    const r = spawnSync(process.execPath, [SENSE, ...args], { encoding: 'utf8', env: { ...process.env, CHROME: '/nonexistent' } });
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /^error {4}--out needs a path\n$/);
+  }
 });
