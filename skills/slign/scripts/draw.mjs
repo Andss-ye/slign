@@ -4,8 +4,14 @@ import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createPen, hinge, project } from './pen.mjs';
+import * as engrave from '../pens/engrave.mjs';
+import * as hairline from '../pens/hairline.mjs';
 
 const LIMIT = 8192;
+const STYLE_LIMIT = { warn: 60 * 1024, fail: 120 * 1024 };
+// The pens beyond hand ink; each exports createPen, finish, paint, baseCss and motionCss.
+const STYLES = { hairline, engrave };
+const styleOf = (o) => o.style ?? 'ink';
 const KEYFRAMES = /@keyframes\s+([\w-]+)\s*\{((?:[^{}]*\{[^{}]*\})*)\s*\}/g;
 const PAD = { top: 14, side: 8, bottom: 6 };
 const SEEDS = [7, 91];
@@ -33,7 +39,7 @@ const BASE =
 /** Anchor and canvas size that crop the drawing tightly, keeping room above it for the gesture. */
 function frame(o) {
   const oy = o.oy ?? 131, xs = [], ys = [];
-  const marks = SEEDS.map((s) => o.draw(createPen(s, oy))).join('');
+  const marks = (STYLES[styleOf(o)] ? [0] : SEEDS).map((s) => o.draw((STYLES[styleOf(o)]?.createPen ?? createPen)(s, oy))).join('');
   for (const [, d] of marks.matchAll(/ d="([^"]+)"/g)) {
     const n = d.replace(/h\.01/g, '').match(/-?\d+(\.\d+)?/g)?.map(Number) ?? [];
     for (let i = 0; i + 1 < n.length; i += 2) { xs.push(n[i]); ys.push(n[i + 1]); }
@@ -51,12 +57,23 @@ function frame(o) {
 /** The object's own gesture CSS, before ROOT and ACTIVE are expanded. */
 export function gestureCss(o, f = frame(o)) {
   const origin = (p) => project(p, f.oy, f.ox).map((v) => `${+v.toFixed(1)}px`).join(' ');
-  return (typeof o.css === 'function' ? o.css({ hinge, origin }) : o.css) ?? '';
+  const own = (typeof o.css === 'function' ? o.css({ hinge, origin }) : o.css) ?? '';
+  return own + (STYLES[styleOf(o)]?.motionCss(o) ?? '');
+}
+
+/** The self-contained SVG of a non-ink style: one crisp pass, one paint, its CSS. */
+function renderStyled(o, f, pens) {
+  const root = `.slign-${o.name}`, box = { x0: PAD.side, y0: PAD.top, x1: f.w - PAD.side, y1: f.h - PAD.bottom };
+  const css = pens.baseCss(o) + gestureCss(o, f).replace(/\bACTIVE\b/g, active(root)).replace(/\bROOT\b/g, root);
+  const { stroke, defs } = pens.paint(o, box);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${f.w} ${f.h}" class="slign slign-${o.name}" role="img" aria-label="${o.label}" fill="none" stroke="${stroke}" stroke-linecap="round" stroke-linejoin="round">` +
+    `${defs}<style>${css}</style>${pens.finish(o.draw(pens.createPen(0, f.oy, f.ox)))}</svg>`;
 }
 
 /** The self-contained SVG: two passes of the same drawing plus its CSS. */
 export function render(o) {
   const f = frame(o), root = `.slign-${o.name}`;
+  if (STYLES[styleOf(o)]) return renderStyled(o, f, STYLES[styleOf(o)]);
   const css = BASE + gestureCss(o, f).replace(/\bACTIVE\b/g, active(root)).replace(/\bROOT\b/g, root);
   const pass = (cls, seed) => `<g class="${cls}">${o.draw(createPen(seed, f.oy, f.ox))}</g>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${f.w} ${f.h}" class="slign slign-${o.name}" role="img" aria-label="${o.label}" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">` +
@@ -69,11 +86,21 @@ export function check(o) {
   if (!/^[a-z][a-z0-9-]*$/.test(o.name ?? '')) errors.push('name: export a kebab-case `name`, for example "router"');
   if (!o.label) errors.push('label: export a human-readable `label`; it becomes the aria-label');
   if (typeof o.draw !== 'function') errors.push('draw: export a `draw(pen)` function that returns the markup');
+  if (!['ink', ...Object.keys(STYLES)].includes(styleOf(o))) errors.push(`style: "${o.style}" is not a style; use ink, hairline or engrave`);
   if (errors.length) return { errors, warnings };
 
-  const own = gestureCss(o), svg = render(o);
-  if (/<(script|image|foreignObject|text|filter|linearGradient|radialGradient|pattern)\b/i.test(svg) || /fill\s*[:=]\s*["']?(?!none)[#a-z]/i.test(svg)) {
+  const style = styleOf(o), own = gestureCss(o), svg = render(o);
+  const banned = style === 'ink' ? 'linearGradient|radialGradient' : 'radialGradient';
+  if (new RegExp(`<(script|image|foreignObject|text|filter|pattern|${banned})\\b`, 'i').test(svg) || /fill\s*[:=]\s*["']?(?!none)[#a-z]/i.test(svg)) {
     errors.push('ink: only strokes drawn by the pen are allowed; no fills, gradients, filters, text or scripts');
+  }
+  if (style !== 'ink') {
+    const gradient = `slign-${o.name}-g`, wanted = style === 'hairline' && o.palette?.stops?.length ? 1 : 0;
+    for (const [, id] of svg.matchAll(/\sid="([^"]*)"/g)) {
+      if (id !== gradient || !wanted) errors.push(`id: the only id allowed is the gradient "${gradient}", all ids start with "slign-${o.name}-" (found "${id}")`);
+    }
+    if ((svg.match(/<linearGradient\b/g) ?? []).length > wanted) errors.push('ink: a hairline drawing has exactly one linearGradient, from palette.stops');
+    if ([...svg.matchAll(/url\(#([^)]*)\)/g)].some(([, id]) => id !== gradient)) errors.push('ink: url(#…) may only point at the drawing gradient');
   }
   for (const [, frames, body] of own.matchAll(KEYFRAMES)) {
     if (!frames.startsWith(`slign-${o.name}-`)) errors.push(`scope: name keyframes "slign-${o.name}-…" so two objects never clash (found "${frames}")`);
@@ -91,8 +118,11 @@ export function check(o) {
     if (!/^(ROOT|ACTIVE)\b/.test(sel.trim())) errors.push(`scope: start every selector with ROOT or ACTIVE (found "${sel.trim()}")`);
   }
 
-  if (Buffer.byteLength(svg) > LIMIT) warnings.push(`size: ${(Buffer.byteLength(svg) / 1024).toFixed(1)} KB is over the 8 KB target; drop detail`);
-  if (!/class="[^"]*\bsl-eye\b/.test(svg)) warnings.push('face: no eyes; leave them out only if a face hurts this drawing');
+  const bytes = Buffer.byteLength(svg), kb = (bytes / 1024).toFixed(1);
+  if (style === 'ink' && bytes > LIMIT) warnings.push(`size: ${kb} KB is over the 8 KB target; drop detail`);
+  if (style !== 'ink' && bytes > STYLE_LIMIT.fail) errors.push(`size: ${kb} KB is over the 120 KB limit; drop detail`);
+  else if (style !== 'ink' && bytes > STYLE_LIMIT.warn) warnings.push(`size: ${kb} KB is over the 60 KB target; drop detail`);
+  if (style === 'ink' && !/class="[^"]*\bsl-eye\b/.test(svg)) warnings.push('face: no eyes; leave them out only if a face hurts this drawing');
   if (!/\bACTIVE\b/.test(own)) warnings.push('gesture: nothing happens on hover; give the object its own gesture');
   return { errors, warnings, svg };
 }
@@ -105,6 +135,7 @@ export function toJsx(svg, name) {
     .replace(`class="slign slign-${name}"`, `className={\`slign slign-${name} \${className}\`} {...props}`)
     .replace(/class=/g, 'className=')
     .replace(/stroke-line(cap|join)=/g, 'strokeLine$1=')
+    .replace(/stop-color=/g, 'stopColor=')
     .replace(/<style>(.*?)<\/style>/s, '<style>{`$1`}</style>');
   return `export default function ${component}({ className = '', ...props }) {\n  return (${body});\n}`;
 }
@@ -195,6 +226,10 @@ async function main(args) {
   for (const w of warnings) console.error(`warning  ${w}`);
   for (const e of errors) console.error(`error    ${e}`);
   if (errors.length) return 1;
+  if (swift && styleOf(o) !== 'ink') {
+    console.error('error    --swift supports only the ink style');
+    return 1;
+  }
   if (into) {
     const page = placeInto(readFileSync(into, 'utf8'), svg, o.name);
     if (page === null) {
