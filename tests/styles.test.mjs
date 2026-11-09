@@ -262,6 +262,26 @@ test('the CLI draws the new styles and --swift is ink only', (t) => {
   assert.match(swift.stderr, /error    --swift supports only the ink style/);
 });
 
+test('a style that is a property of Object.prototype is an error, never a crash', () => {
+  for (const style of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+    const { errors } = check(engrave({ style }));
+    assert.equal(errors.length, 1, style);
+    assert.match(errors[0], /not a style/);
+  }
+  assert.doesNotThrow(() => render(engrave({ style: 'constructor', draw: (pen) => pen.line([[0, 0, 0], [10, 0, 0]]) })));
+});
+
+test('the paper may be any plain CSS color and is checked like the ink', () => {
+  for (const paper of ['#fefdfa', 'rgb(250, 248, 240)', 'hsl(40 30% 96%)', 'oklch(97% .01 90)', 'ivory']) {
+    assert.deepEqual(check(engrave({ palette: { paper } })).errors, [], paper);
+  }
+  const bad = 'red;} .x{fill:url(//e)';
+  for (const [style, palette] of [['engrave', { paper: bad }], ['engrave', { ink: bad }], ['icon', { ink: '#000";onload="x' }], ['hairline', { stops: ['#111', '#eee'], ink: '<b>' }]]) {
+    const { errors } = check({ ...engrave(), style, palette, ...(style === 'icon' ? { draw: (pen) => pen.line([[4, 12], [20, 12]]) } : {}) });
+    assert.deepEqual(errors, ['palette: paper/ink must be a plain CSS color'], style);
+  }
+});
+
 test('an engraved face is filled with the paper so what is behind it stays hidden', () => {
   const svg = render(engrave({ palette: { paper: '#fefdfa' } }));
   assert.ok(svg.includes('class="sl-fill"'));
