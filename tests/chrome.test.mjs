@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { findChrome, launch } from '../skills/slign/scripts/chrome.mjs';
+import { spawn, spawnSync } from 'node:child_process';
+import { findChrome, launch, rpc, stopGroup } from '../skills/slign/scripts/chrome.mjs';
 
 const alive = (profile) => spawnSync('pgrep', ['-f', profile]).status === 0;
 
@@ -25,7 +25,42 @@ test('it drives Chrome, evaluates in the page, screenshots, and leaves nothing r
     assert.ok(alive(chrome.profile));
   } finally {
     await chrome.close();
+    rmSync(dir, { recursive: true, force: true });
   }
   assert.equal(alive(chrome.profile), false);
   assert.equal(existsSync(chrome.profile), false);
+});
+
+test('rpc rejects a call that is never answered', async () => {
+  const send = rpc({ send() {} }, 50);
+  await assert.rejects(send('Page.enable'), /timed out/);
+});
+
+test('rpc rejects pending calls when the socket closes', async () => {
+  const ws = { send() {} };
+  const send = rpc(ws, 5000);
+  const call = send('Page.enable');
+  ws.onclose();
+  await assert.rejects(call, /closed/);
+  await assert.rejects(send('Page.enable'), /closed/);
+});
+
+test('stopGroup kills the group even when the main process already exited', async () => {
+  const mark = `slign-mark-${process.pid}-${Date.now()}`;
+  const child = spawn('sh', ['-c', `(exec -a ${mark} sleep 300) & exit 0`], { detached: true, stdio: 'ignore' });
+  const exited = new Promise((r) => child.once('exit', r));
+  await exited;
+  await new Promise((r) => setTimeout(r, 200));
+  assert.equal(spawnSync('pgrep', ['-f', mark]).status, 0);
+  await stopGroup(child, exited, 100);
+  await new Promise((r) => setTimeout(r, 200));
+  assert.equal(spawnSync('pgrep', ['-f', mark]).status, 1);
+});
+
+test('stopGroup kills a process that ignores SIGTERM', async () => {
+  const child = spawn('sh', ['-c', 'trap "" TERM; while :; do sleep 1; done'], { detached: true, stdio: 'ignore' });
+  const exited = new Promise((r) => child.once('exit', r));
+  await new Promise((r) => setTimeout(r, 200));
+  await stopGroup(child, exited, 100);
+  assert.equal(await Promise.race([exited.then(() => true), new Promise((r) => setTimeout(() => r(false), 2000))]), true);
 });

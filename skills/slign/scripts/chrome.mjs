@@ -18,6 +18,54 @@ export function findChrome() {
   ].find((p) => p && existsSync(p));
 }
 
+/**
+ * SIGTERM to Chrome's process group, then SIGKILL after the grace period.
+ * The kill is unconditional: helpers can outlive the main process.
+ */
+export async function stopGroup(child, exited, grace = 2000) {
+  let timer;
+  try { process.kill(-child.pid, 'SIGTERM'); } catch {}
+  await Promise.race([exited, new Promise((r) => { timer = setTimeout(r, grace).unref(); })]);
+  clearTimeout(timer);
+  try { process.kill(-child.pid, 'SIGKILL'); } catch {}
+}
+
+/**
+ * JSON-RPC over a DevTools WebSocket: returns send(method, params).
+ * Every call settles: with the result, an error, a timeout, or the socket closing.
+ */
+export function rpc(ws, timeout = 30000, onEvent = () => {}) {
+  let id = 0;
+  let closed = false;
+  const pending = new Map();
+  const settle = (key, fn, value) => {
+    const p = pending.get(key);
+    if (!p) return;
+    pending.delete(key);
+    clearTimeout(p.timer);
+    fn(p, value);
+  };
+  ws.onclose = () => {
+    closed = true;
+    for (const key of [...pending.keys()]) settle(key, (p) => p.rej(new Error('DevTools connection closed')));
+  };
+  ws.onmessage = ({ data }) => {
+    const m = JSON.parse(data);
+    if (!m.id) return onEvent(m.method);
+    settle(m.id, (p) => (m.error ? p.rej(new Error(m.error.message)) : p.res(m.result)));
+  };
+  return (method, params = {}) => new Promise((res, rej) => {
+    if (closed) return rej(new Error('DevTools connection closed'));
+    const key = ++id;
+    const timer = setTimeout(
+      () => settle(key, (p) => p.rej(new Error(`${method} timed out after ${timeout} ms`))),
+      timeout,
+    ).unref();
+    pending.set(key, { res, rej, timer });
+    ws.send(JSON.stringify({ id: key, method, params }));
+  });
+}
+
 /** An http(s)/file/data URL as is; anything else is a local path. */
 const toUrl = (u) => (/^(https?|file|data|about):/.test(u) ? u : pathToFileURL(resolve(u)).href);
 
@@ -34,10 +82,7 @@ export async function launch({ width = 1280, height = 900 } = {}) {
   let ws;
   const close = async () => {
     try { ws?.close(); } catch {}
-    for (const sig of ['SIGTERM', 'SIGKILL']) {
-      try { process.kill(-child.pid, sig); } catch {}
-      if (await Promise.race([exited.then(() => true), sleep(2000)])) break;
-    }
+    await stopGroup(child, exited);
     rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   };
 
@@ -52,21 +97,8 @@ export async function launch({ width = 1280, height = 900 } = {}) {
     ws = new WebSocket(target.webSocketDebuggerUrl);
     await new Promise((res, rej) => { ws.onopen = res; ws.onerror = () => rej(new Error('DevTools connection failed')); });
 
-    let id = 0;
-    const pending = new Map();
     const waiting = new Set();
-    ws.onmessage = ({ data }) => {
-      const m = JSON.parse(data);
-      if (m.id) {
-        const { res, rej } = pending.get(m.id);
-        pending.delete(m.id);
-        m.error ? rej(new Error(m.error.message)) : res(m.result);
-      } else for (const w of waiting) w(m.method);
-    };
-    const send = (method, params = {}) => new Promise((res, rej) => {
-      pending.set(++id, { res, rej });
-      ws.send(JSON.stringify({ id, method, params }));
-    });
+    const send = rpc(ws, 30000, (method) => { for (const w of waiting) w(method); });
     const loaded = () => new Promise((res, rej) => {
       const timer = setTimeout(() => rej(new Error('page did not load')), 30000).unref();
       const w = (method) => {
