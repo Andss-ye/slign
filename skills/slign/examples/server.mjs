@@ -1,7 +1,6 @@
 // Teaches: a plain box, repeated detail, and a staggered sequence.
 export const name = 'server';
 export const label = 'Server';
-export const oy = 152;
 
 export function draw(pen) {
   const w = 26, h = 66;

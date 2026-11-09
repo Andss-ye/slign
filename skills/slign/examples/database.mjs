@@ -1,7 +1,6 @@
 // Teaches: cylinders drawn with rings, and a part that lifts with a bounce.
 export const name = 'database';
 export const label = 'Database';
-export const oy = 148;
 
 const R = 30, H = 16;
 const on = (deg, z) => [R * Math.cos((deg * Math.PI) / 180), R * Math.sin((deg * Math.PI) / 180), z];

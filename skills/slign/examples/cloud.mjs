@@ -1,7 +1,6 @@
 // Teaches: an organic outline with curve(), and continuous motion.
 export const name = 'cloud';
 export const label = 'Cloud';
-export const oy = 132;
 
 export function draw(pen) {
   const puff = [[-44, 0, 0], [-52, 0, 14], [-40, 0, 28], [-26, 0, 24], [-18, 0, 46], [4, 0, 50], [16, 0, 32], [32, 0, 36], [48, 0, 18], [42, 0, 0]];

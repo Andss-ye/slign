@@ -1,7 +1,6 @@
 // Teaches: a tall object made of several parts, and pieces that separate.
 export const name = 'rocket';
 export const label = 'Rocket';
-export const oy = 166;
 
 const R = 15;
 const on = (deg, z, r = R) => [r * Math.cos((deg * Math.PI) / 180), r * Math.sin((deg * Math.PI) / 180), z];

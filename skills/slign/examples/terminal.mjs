@@ -1,7 +1,6 @@
 // Teaches: symbols drawn on a face, and things that appear step by step.
 export const name = 'terminal';
 export const label = 'Terminal';
-export const oy = 146;
 
 export function draw(pen) {
   const w = 46, h = 64, d = -10;
