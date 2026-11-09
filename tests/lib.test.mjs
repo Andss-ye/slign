@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,13 +32,15 @@ export const css = 'ACTIVE .sl-g{animation:slign-${name}-a .4s}@keyframes slign-
 
 const profile = (extra) => ({ theme: 'light', paper: '#fff', ink: '#111', accent: '#06f', gradient: null, type: { head: 'sans', body: 'sans' }, ...extra });
 
-test('styleFor: dark with a gradient is hairline, light with serif heads is engrave, else ink', () => {
+test('styleFor: dark is hairline, light serif heads engrave, mono bodies stay ink, any other light page is hairline', () => {
   assert.equal(styleFor(profile({ theme: 'dark', gradient: ['#4f46e5', '#06b6d4'] })), 'hairline');
+  assert.equal(styleFor(profile({ theme: 'dark' })), 'hairline');
+  assert.equal(styleFor(profile({ theme: 'dark', type: { head: 'serif', body: 'serif' } })), 'hairline');
   assert.equal(styleFor(profile({ type: { head: 'serif', body: 'serif' } })), 'engrave');
-  assert.equal(styleFor(profile()), 'ink');
-  assert.equal(styleFor(profile({ theme: 'dark' })), 'ink');
-  assert.equal(styleFor(profile({ gradient: ['#000', '#fff'] })), 'ink');
-  assert.equal(styleFor(profile({ theme: 'dark', type: { head: 'serif', body: 'serif' } })), 'ink');
+  assert.equal(styleFor(profile({ type: { head: 'sans', body: 'mono' } })), 'ink');
+  assert.equal(styleFor(profile({ type: { head: 'serif', body: 'mono' } })), 'engrave');
+  assert.equal(styleFor(profile()), 'hairline');
+  assert.equal(styleFor(profile({ gradient: ['#000', '#fff'] })), 'hairline');
 });
 
 test('init writes the config, an empty index and a short readme, and refuses a second run', (t) => {
@@ -49,7 +51,7 @@ test('init writes the config, an empty index and a short readme, and refuses a s
   const config = JSON.parse(s.read('slign/slign.config.json'));
   assert.equal(config.style, 'ink');
   assert.deepEqual(config.formats, ['svg', 'jsx']);
-  assert.deepEqual(config.budget, { icon: 1536, illustration: 12288, component: 12288 });
+  assert.deepEqual(config.budget, { icon: 700, illustration: 12288, component: 12288 });
   assert.ok(config.version && config.palette && 'stroke' in config);
   assert.deepEqual(s.index(), { version: 1, items: [] });
   assert.ok(s.read('slign/README.md').trim().split('\n').length <= 6);
@@ -95,7 +97,7 @@ test('add writes the svg, jsx, source and index, sorted, and rejects duplicates'
 
   const dup = s.lib('add', 'alpha.mjs');
   assert.equal(dup.status, 1);
-  assert.match(dup.stderr, /^error {4}alpha.*--force/);
+  assert.match(dup.stderr, /^error {4}alpha.*--force/m);
   assert.equal(s.index().items.length, 3);
   assert.equal(s.lib('add', 'alpha.mjs', '--force').status, 0);
   assert.equal(s.index().items.length, 3);
@@ -209,4 +211,81 @@ test('index.json and every printed path stay relative to the library', (t) => {
   assert.ok(!index.includes(s.cwd) && !index.includes('/Users') && !index.includes('..'), index);
   assert.ok(!added.stdout.includes(s.cwd), added.stdout);
   assert.match(added.stdout, /my lib\/icons\/alpha\.svg/);
+});
+
+test('an icon over 520 bytes is added with a warning', (t) => {
+  const s = sandbox();
+  t.after(s.done);
+  s.lib('init');
+  s.write('small.mjs', "export const name = 'small';export const label = 'Small';export const style = 'icon';export const draw = (pen) => pen.line([[4, 12], [20, 12]]);");
+  const small = s.lib('add', 'small.mjs');
+  assert.equal(small.status, 0, small.stderr);
+  assert.ok(!small.stderr.includes('over the 520 target'), small.stderr);
+  const lines = Array.from({ length: 12 }, (_, i) => `pen.line([[${i + 1}, 3], [${22 - i}, 21]])`).join(' + ');
+  s.write('wide.mjs', `export const name = 'wide';
+export const label = 'Wide';
+export const style = 'icon';
+export const draw = (pen) => pen.group('g', ${lines});
+export const css = 'ACTIVE .sl-g{animation:slign-wide-a .4s}@keyframes slign-wide-a{50%{transform:scale(1.1)}}';
+`);
+  const wide = s.lib('add', 'wide.mjs');
+  assert.equal(wide.status, 0, wide.stderr);
+  const bytes = s.index().items.find((i) => i.name === 'wide').bytes;
+  assert.ok(bytes > 520 && bytes <= 700, bytes);
+  assert.ok(wide.stderr.includes(`warn    wide is ${bytes} bytes, over the 520 target\n`), wide.stderr);
+});
+
+const lsr = (dir) => readdirSync(dir, { recursive: true }).sort();
+
+test('remove deletes the drawing, its outputs and its source, and keeps the index sorted', (t) => {
+  const s = sandbox();
+  t.after(s.done);
+  s.lib('init');
+  for (const n of ['beta', 'alpha', 'gamma']) s.lib('add', s.iconFile(n));
+  const r = s.lib('remove', 'beta');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(s.index().items.map((i) => i.name), ['alpha', 'gamma']);
+  const files = lsr(join(s.cwd, 'slign')).filter((f) => f.includes('beta'));
+  assert.deepEqual(files, []);
+  assert.equal(s.lib('build').stdout.trim(), 'ok');
+
+  const ghost = s.lib('remove', 'beta');
+  assert.equal(ghost.status, 1);
+  assert.match(ghost.stderr, /^error {4}beta is not in the library/);
+  const kind = s.lib('remove', 'alpha', '--kind', 'illustration');
+  assert.equal(kind.status, 1);
+  assert.match(kind.stderr, /^error {4}alpha is an icon, not an illustration/);
+  assert.equal(s.index().items.length, 2);
+  assert.equal(s.lib('remove', 'alpha', '--kind', 'icon').status, 0);
+  assert.equal(s.lib('remove').status, 1);
+});
+
+test('rename moves the outputs and the source to the new name and build stays clean', (t) => {
+  const s = sandbox();
+  t.after(s.done);
+  s.lib('init');
+  for (const n of ['zed', 'alpha']) s.lib('add', s.iconFile(n));
+  const added = s.index().items.find((i) => i.name === 'zed').added;
+  const r = s.lib('rename', 'zed', 'beta');
+  assert.equal(r.status, 0, r.stderr);
+  const items = s.index().items;
+  assert.deepEqual(items.map((i) => i.name), ['alpha', 'beta']);
+  assert.equal(items[1].file, 'icons/beta.svg');
+  assert.equal(items[1].added, added);
+  assert.deepEqual(lsr(join(s.cwd, 'slign')).filter((f) => f.includes('zed')), []);
+  assert.ok(s.read('slign/icons/beta.svg').includes('slign-beta') && !s.read('slign/icons/beta.svg').includes('slign-zed'));
+  assert.match(s.read('slign/icons/beta.jsx'), /function Beta/);
+  assert.match(s.read('slign/src/beta.mjs'), /name = 'beta'/);
+  assert.equal(s.lib('build').stdout.trim(), 'ok');
+
+  const dup = s.lib('rename', 'beta', 'alpha');
+  assert.equal(dup.status, 1);
+  assert.match(dup.stderr, /^error {4}alpha is already in the library/);
+  assert.match(s.lib('rename', 'ghost', 'new').stderr, /^error {4}ghost is not in the library/);
+  const bad = s.lib('rename', 'beta', 'Bad Name');
+  assert.equal(bad.status, 1);
+  assert.deepEqual(s.index().items.map((i) => i.name), ['alpha', 'beta']);
+  assert.ok(!existsSync(join(s.cwd, 'slign/src/Bad Name.mjs')));
+  assert.equal(s.lib('build').stdout.trim(), 'ok');
+  assert.equal(s.lib('rename', 'beta').status, 1);
 });
