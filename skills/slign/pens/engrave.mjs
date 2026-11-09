@@ -37,9 +37,9 @@ function sweep(poly, deg, spacing) {
   return segs;
 }
 
-/** Hatch segments that shade a convex screen polygon: denser with tone, crossed above 0.7. */
-export function hatchLines(poly, { tone = 0.5, angle = 35, spacing = lerp(5, 1.6, tone) } = {}) {
-  return { main: sweep(poly, angle, spacing), cross: tone > 0.7 ? sweep(poly, angle + 90, spacing * 1.5) : [] };
+/** Hatch segments that shade a convex screen polygon: denser with tone, crossed above 0.85. */
+export function hatchLines(poly, { tone = 0.5, angle = 35, spacing = lerp(6, 2.2, tone) } = {}) {
+  return { main: sweep(poly, angle, spacing), cross: tone > 0.85 ? sweep(poly, angle + 90, spacing * 1.5) : [] };
 }
 
 /** Tone of a 3D polygon from its normal against the light: 0.15 lit, up to 1 turned away. */
@@ -70,7 +70,9 @@ export function createPen(seed, oy = 131, ox = 100) {
       }).join('');
       return `<path class="sl-hatch" d="${d}"/>`;
     };
-    return stroke(main) + stroke(cross) + pen.line(points, { closed: true });
+    // Paper under the hatching, so a face hides whatever was drawn behind it: author back to front.
+    const paper = `<path class="sl-fill" d="M${points.map((p) => shift(project(p, 0, 0))).join('L')}Z"/>`;
+    return paper + stroke(main) + stroke(cross) + pen.line(points, { closed: true });
   };
 
   /** `n` dots scattered inside a convex 3D polygon, as one path. */
@@ -94,8 +96,9 @@ export const finish = (markup) => markup;
 
 export const paint = (o) => ({ stroke: o.palette?.ink ?? 'currentColor', defs: '' });
 
-export const baseCss = () =>
+export const baseCss = (o = {}) =>
   '.slign{--_w:var(--slign-stroke,1.4)}' +
+  `.slign .sl-fill{fill:var(--slign-paper,${o.palette?.paper ?? '#ffffff'});stroke:none}` +
   '.slign .sl-l{stroke-width:var(--_w)}' +
   '.slign .sl-hatch{stroke-width:calc(var(--_w)*.43)}' +
   '.slign .sl-dot{stroke-width:calc(var(--_w)*1.1)}' +

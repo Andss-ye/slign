@@ -8,6 +8,8 @@ import * as engrave from '../pens/engrave.mjs';
 import * as hairline from '../pens/hairline.mjs';
 
 const LIMIT = 8192;
+// The paper an engraved face is filled with is the one fill allowed.
+const PAPER_FILL = /\.sl-fill\{fill:var\(--slign-paper,#[0-9a-f]{3,8}\);stroke:none\}/i;
 const STYLE_LIMIT = { warn: 60 * 1024, fail: 120 * 1024 };
 // The pens beyond hand ink; each exports createPen, finish, paint, baseCss and motionCss.
 const STYLES = { hairline, engrave };
@@ -91,7 +93,7 @@ export function check(o) {
 
   const style = styleOf(o), own = gestureCss(o), svg = render(o);
   const banned = style === 'ink' ? 'linearGradient|radialGradient' : 'radialGradient';
-  if (new RegExp(`<(script|image|foreignObject|text|filter|pattern|${banned})\\b`, 'i').test(svg) || /fill\s*[:=]\s*["']?(?!none)[#a-z]/i.test(svg)) {
+  if (new RegExp(`<(script|image|foreignObject|text|filter|pattern|${banned})\\b`, 'i').test(svg) || /fill\s*[:=]\s*["']?(?!none)[#a-z]/i.test(style === 'engrave' ? svg.replace(PAPER_FILL, '') : svg)) {
     errors.push('ink: only strokes drawn by the pen are allowed; no fills, gradients, filters, text or scripts');
   }
   if (style !== 'ink') {

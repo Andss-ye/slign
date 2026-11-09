@@ -114,9 +114,9 @@ test('hatch lines follow the requested screen direction', () => {
   assert.ok(Math.abs(a[0] - b[0]) < 1e-6);
 });
 
-test('cross-hatch appears only above tone 0.7', () => {
-  for (const tone of [0.15, 0.5, 0.7]) assert.equal(hatchLines(SQUARE, { tone }).cross.length, 0, `tone ${tone}`);
-  for (const tone of [0.71, 0.9, 1]) assert.ok(hatchLines(SQUARE, { tone }).cross.length > 0, `tone ${tone}`);
+test('cross-hatch appears only above tone 0.85', () => {
+  for (const tone of [0.15, 0.5, 0.85]) assert.equal(hatchLines(SQUARE, { tone }).cross.length, 0, `tone ${tone}`);
+  for (const tone of [0.86, 0.95, 1]) assert.ok(hatchLines(SQUARE, { tone }).cross.length > 0, `tone ${tone}`);
   const dark = [...render(engrave()).matchAll(/class="sl-hatch" d="/g)].length;
   const light = [...render(engrave({ draw: (pen) => pen.face([[0, 0, 20], [30, 0, 20], [30, 30, 20], [0, 30, 20]], { tone: 0.3 }) })).matchAll(/class="sl-hatch" d="/g)].length;
   assert.equal(light, 1);
@@ -236,4 +236,12 @@ test('the CLI draws the new styles and --swift is ink only', () => {
   const swift = spawnSync('node', [DRAW, 'wire.mjs', '--swift'], { cwd: dir, encoding: 'utf8' });
   assert.equal(swift.status, 1);
   assert.match(swift.stderr, /error    --swift supports only the ink style/);
+});
+
+test('an engraved face is filled with the paper so what is behind it stays hidden', () => {
+  const svg = render(engrave({ palette: { paper: '#fefdfa' } }));
+  assert.ok(svg.includes('class="sl-fill"'));
+  assert.ok(svg.includes('.sl-fill{fill:var(--slign-paper,#fefdfa);stroke:none}'));
+  assert.ok(svg.indexOf('class="sl-fill"') < svg.indexOf('class="sl-hatch"'), 'the paper goes under the hatching');
+  assert.deepEqual(check(engrave({ palette: { paper: '#fefdfa' } })).errors, []);
 });
