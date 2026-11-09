@@ -37,6 +37,8 @@ Two things to expect:
   only reads as open past about 100 degrees. Render it to choose.
 - The matrix treats the part as flat. A few units of thickness survive the turn;
   a thick slab skews. Keep hinged parts thin.
+- Around an upright axis (a padlock shackle, a door) the part goes edge-on fast:
+  stay under about 30 degrees.
 
 See `examples/laptop.mjs`.
 
