@@ -4,14 +4,9 @@ import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileS
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { findChrome } from './chrome.mjs';
 
-const CHROME = [
-  process.env.CHROME,
-  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  '/usr/bin/google-chrome',
-  '/usr/bin/chromium',
-  '/usr/bin/chromium-browser',
-].find((p) => p && existsSync(p));
+const CHROME = findChrome();
 
 /** Page that shows the drawing large, on paper or dark, optionally mid-gesture. */
 export function pageFor(svg, { dark = false, active = false } = {}) {
