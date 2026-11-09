@@ -242,7 +242,7 @@ test('the size budget is 60 KB to warn and 120 KB to fail for the new styles', (
 });
 
 test('the sample objects follow the style and stay under the size budget', async () => {
-  for (const file of ['hairline-cube', 'engrave-cube']) {
+  for (const file of ['hairline-cube', 'hairline-stack', 'engrave-cube']) {
     const o = await import(`../skills/slign/pens/samples/${file}.mjs`);
     const { errors, warnings, svg } = check(o);
     assert.deepEqual(errors, [], file);
