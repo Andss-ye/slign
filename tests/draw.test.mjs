@@ -33,7 +33,7 @@ function project(files) {
 
 test('render gives a self-contained single-ink svg with both passes', () => {
   const svg = render(box());
-  assert.ok(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" class="slign slign-box"'));
+  assert.match(svg, /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 \d+ \d+" class="slign slign-box"/);
   assert.ok(svg.includes('stroke="currentColor"') && svg.includes('fill="none"'));
   assert.ok(svg.includes('class="sl-a"') && svg.includes('class="sl-b"'));
   assert.ok(svg.includes('prefers-reduced-motion'));
@@ -43,13 +43,44 @@ test('ROOT and ACTIVE expand to the object scope', () => {
   const svg = render(box());
   assert.ok(!/\bROOT\b|\bACTIVE\b/.test(svg));
   assert.ok(svg.includes('.slign-box .sl-lid{transition'));
-  assert.ok(svg.includes(':is(.slign-box:hover,.slign-box:focus-visible,.slign-box.slign-active,[data-slign-trigger]:hover .slign-box) .sl-lid{transform'));
+  assert.ok(svg.includes(':is(.slign-box:hover,.slign-box.slign-active,[data-slign-trigger]:hover .slign-box,') && svg.includes(' .sl-lid{transform'));
 });
 
 test('css can be a function that receives hinge and origin', () => {
   const svg = render(box({ css: ({ hinge, origin }) => `ROOT .sl-lid{transform-origin:${origin([0, 0, 0])}}ACTIVE .sl-lid{transform:${hinge({ axis: [1, 0, 0], up: [0, 0, 1], deg: 0 })}}` }));
-  assert.ok(svg.includes('transform-origin:100px 131px'));
+  assert.match(svg, /transform-origin:[\d.]+px [\d.]+px/);
   assert.ok(svg.includes('transform:matrix(1,0,0,1,0,0)'));
+});
+
+const viewBox = (svg) => svg.match(/viewBox="([^"]+)"/)[1].split(' ').map(Number);
+const coords = (svg) => [...svg.matchAll(/ d="([^"]+)"/g)].flatMap(([, d]) => d.replace(/h\.01/g, '').match(/-?\d+(\.\d+)?/g).map(Number));
+
+test('the canvas is cropped to the drawing, with its origin at 0 0', () => {
+  const svg = render(box());
+  const [x, y, w, h] = viewBox(svg);
+  assert.deepEqual([x, y], [0, 0]);
+  assert.ok(w < 80 && h < 80, `expected a tight box, got ${w}x${h}`);
+  const n = coords(svg);
+  for (let i = 0; i < n.length; i += 2) assert.ok(n[i] > 0 && n[i] < w && n[i + 1] > 0 && n[i + 1] < h);
+});
+
+test('the hinge origin lands on the drawn point after cropping', () => {
+  const svg = render(box({ draw: (pen) => pen.eye([2, 0, 5]) + pen.dot([0, 0, 9]), css: ({ origin }) => `ROOT .sl-x{transform-origin:${origin([0, 0, 9])}}ACTIVE .sl-x{opacity:1}` }));
+  const [ox, oy] = svg.match(/transform-origin:([\d.]+)px ([\d.]+)px/).slice(1).map(Number);
+  const [dx, dy] = svg.match(/class="sl-dot" d="M(-?[\d.]+) (-?[\d.]+)/).slice(1).map(Number);
+  assert.ok(Math.abs(ox - dx) < 1.5 && Math.abs(oy - dy) < 1.5);
+});
+
+test('size follows the font with --slign-size and never overflows its container', () => {
+  const svg = render(box());
+  assert.ok(svg.includes('max-width:100%') && svg.includes('height:auto'));
+  assert.ok(svg.includes('.slign:not([width]){width:var(--slign-size,8em)}'), 'a width attribute set on the page must still win');
+});
+
+test('a card plays the gesture on keyboard focus and on touch', () => {
+  const svg = render(box());
+  assert.ok(svg.includes('[data-slign-trigger]:focus-within .slign-box'));
+  assert.ok(svg.includes('[data-slign-trigger]:active .slign-box'));
 });
 
 test('a well-formed object passes with no errors or warnings', () => {
@@ -117,18 +148,45 @@ test('the CLI fails clearly and writes nothing for a broken object', () => {
   assert.ok(!existsSync(join(dir, 'empty.svg')));
 });
 
-test('toJsx renames attributes and wraps the style in a template string', () => {
-  const jsx = toJsx(render(box()));
-  assert.ok(jsx.startsWith('<svg viewBox="0 0 200 200" className="slign slign-box"'));
+test('toJsx makes a component that keeps the slign classes', () => {
+  const jsx = toJsx(render(box({ name: 'coffee-mug' })), 'coffee-mug');
+  assert.ok(jsx.startsWith('export default function CoffeeMug({ className = \'\', ...props }) {'));
+  assert.ok(jsx.includes('className={`slign slign-coffee-mug ${className}`}') && jsx.includes('{...props}'));
   assert.ok(!/\sclass=|stroke-linecap=|stroke-linejoin=|xmlns=/.test(jsx));
   assert.ok(jsx.includes('strokeLinecap="round"') && jsx.includes('<style>{`.slign{') && jsx.includes('`}</style>'));
 });
 
-test('the CLI writes a .jsx file next to the svg when asked', () => {
+test('the CLI writes a .jsx component next to the svg when asked', () => {
   const dir = project({ 'box.mjs': SOURCE });
   const run = spawnSync('node', [DRAW, 'box.mjs', '--jsx'], { cwd: dir, encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr);
-  assert.ok(readFileSync(join(dir, 'box.jsx'), 'utf8').includes('className="slign slign-box"'));
+  assert.match(readFileSync(join(dir, 'box.jsx'), 'utf8'), /^export default function Box\(/);
+});
+
+test('--into puts the svg where the marker is, and replaces it in place on a redraw', () => {
+  const dir = project({ 'box.mjs': SOURCE, 'page.html': '<main>\n  <!-- slign:box -->\n  <h2>Empty</h2>\n</main>\n' });
+  const first = spawnSync('node', [DRAW, 'box.mjs', '--into', 'page.html'], { cwd: dir, encoding: 'utf8' });
+  assert.equal(first.status, 0, first.stderr);
+  const page = readFileSync(join(dir, 'page.html'), 'utf8');
+  assert.match(page, /^<main>\n {2}<svg [^>]*class="slign slign-box"[\s\S]*<\/svg>\n {2}<h2>Empty<\/h2>/);
+  assert.ok(!page.includes('slign:box') && !existsSync(join(dir, 'box.svg')));
+  const again = spawnSync('node', [DRAW, 'box.mjs', '--into', 'page.html'], { cwd: dir, encoding: 'utf8' });
+  assert.equal(again.status, 0, again.stderr);
+  assert.equal(readFileSync(join(dir, 'page.html'), 'utf8'), page);
+});
+
+test('--into fails clearly when the page has no marker and no drawing to replace', () => {
+  const dir = project({ 'box.mjs': SOURCE, 'page.html': '<main></main>\n' });
+  const run = spawnSync('node', [DRAW, 'box.mjs', '--into', 'page.html'], { cwd: dir, encoding: 'utf8' });
+  assert.equal(run.status, 1);
+  assert.match(run.stderr, /<!-- slign:box -->/);
+  assert.equal(readFileSync(join(dir, 'page.html'), 'utf8'), '<main></main>\n');
+});
+
+test('--help prints the usage and succeeds', () => {
+  const run = spawnSync('node', [DRAW, '--help'], { encoding: 'utf8' });
+  assert.equal(run.status, 0);
+  assert.match(run.stdout, /usage: node draw\.mjs <object\.mjs>.*--into/);
 });
 
 test('the CLI asks for an argument when there is none', () => {

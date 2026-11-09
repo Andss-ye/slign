@@ -1,5 +1,4 @@
 const ISO = Math.cos(Math.PI / 6);
-const OX = 100;
 const n = (v) => +v.toFixed(1);
 const xy = ([x, y]) => `${n(x)} ${n(y)}`;
 const mid = (a, b) => a.map((v, i) => (v + b[i]) / 2);
@@ -7,10 +6,10 @@ const mid = (a, b) => a.map((v, i) => (v + b[i]) / 2);
 /** Isometric projection of a 3D direction: x recedes right, y recedes left, z is up. */
 export const projectVector = ([x, y, z]) => [(x - y) * ISO, (x + y) / 2 - z];
 
-/** Screen position of a 3D point on the 200x200 canvas. */
-export const project = (p, oy = 131) => {
+/** Screen position of a 3D point, with the 3D origin drawn at (ox, oy). */
+export const project = (p, oy = 131, ox = 100) => {
   const [sx, sy] = projectVector(p);
-  return [OX + sx, oy + sy];
+  return [ox + sx, oy + sy];
 };
 
 /**
@@ -33,10 +32,10 @@ export function hinge({ axis, up, deg }) {
  * Hand-ink pen over the isometric projection.
  * Each seed gives a different pulse of the same drawing.
  */
-export function createPen(seed, oy = 131) {
+export function createPen(seed, oy = 131, ox = 100) {
   const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32 - 0.5) * 2;
   const at = (p, jitter) => {
-    const [x, y] = project(p, oy);
+    const [x, y] = project(p, oy, ox);
     return [x + rnd() * jitter, y + rnd() * jitter];
   };
   const cls = (base, o) => [base, o.thin && 'sl-thin', o.cls].filter(Boolean).join(' ');

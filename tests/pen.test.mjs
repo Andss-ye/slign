@@ -7,6 +7,13 @@ const count = (s, re) => (s.match(re) || []).length;
 test('project puts the 3D origin at the canvas anchor', () => {
   assert.deepEqual(project([0, 0, 0]), [100, 131]);
   assert.deepEqual(project([0, 0, 10], 150), [100, 140]);
+  assert.deepEqual(project([0, 0, 0], 40, 30), [30, 40]);
+});
+
+test('the pen draws at the anchor it is given', () => {
+  const at = (d) => d.match(/M(-?[\d.]+) (-?[\d.]+)/).slice(1).map(Number);
+  const [x, y] = at(createPen(7, 40, 30).dot([0, 0, 0]));
+  assert.ok(Math.abs(x - 30) < 1 && Math.abs(y - 40) < 1);
 });
 
 test('x recedes right-down, y recedes left-down, z goes up', () => {
