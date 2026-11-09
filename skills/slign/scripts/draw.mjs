@@ -6,13 +6,15 @@ import { pathToFileURL } from 'node:url';
 import { createPen, hinge, project } from './pen.mjs';
 import * as engrave from '../pens/engrave.mjs';
 import * as hairline from '../pens/hairline.mjs';
+import * as icon from '../pens/icon.mjs';
 
 const LIMIT = 8192;
 // The paper an engraved face is filled with is the one fill allowed.
 const PAPER_FILL = /\.sl-fill\{fill:var\(--slign-paper,#[0-9a-f]{3,8}\);stroke:none\}/i;
 const STYLE_LIMIT = { warn: 60 * 1024, fail: 120 * 1024 };
 // The pens beyond hand ink; each exports createPen, finish, paint, baseCss and motionCss.
-const STYLES = { hairline, engrave };
+// A pen that exports render(o, gesture) draws the whole SVG itself.
+const STYLES = { hairline, engrave, icon };
 const styleOf = (o) => o.style ?? 'ink';
 const KEYFRAMES = /@keyframes\s+([\w-]+)\s*\{((?:[^{}]*\{[^{}]*\})*)\s*\}/g;
 const PAD = { top: 14, side: 8, bottom: 6 };
@@ -74,6 +76,7 @@ function renderStyled(o, f, pens) {
 
 /** The self-contained SVG: two passes of the same drawing plus its CSS. */
 export function render(o) {
+  if (STYLES[styleOf(o)]?.render) return STYLES[styleOf(o)].render(o, gestureCss(o, { ox: 0, oy: 0 }));
   const f = frame(o), root = `.slign-${o.name}`;
   if (STYLES[styleOf(o)]) return renderStyled(o, f, STYLES[styleOf(o)]);
   const css = BASE + gestureCss(o, f).replace(/\bACTIVE\b/g, active(root)).replace(/\bROOT\b/g, root);
@@ -88,11 +91,11 @@ export function check(o) {
   if (!/^[a-z][a-z0-9-]*$/.test(o.name ?? '')) errors.push('name: export a kebab-case `name`, for example "router"');
   if (!o.label) errors.push('label: export a human-readable `label`; it becomes the aria-label');
   if (typeof o.draw !== 'function') errors.push('draw: export a `draw(pen)` function that returns the markup');
-  if (!['ink', ...Object.keys(STYLES)].includes(styleOf(o))) errors.push(`style: "${o.style}" is not a style; use ink, hairline or engrave`);
+  if (!['ink', ...Object.keys(STYLES)].includes(styleOf(o))) errors.push(`style: "${o.style}" is not a style; use ink, hairline, engrave or icon`);
   if (errors.length) return { errors, warnings };
 
   const style = styleOf(o), own = gestureCss(o), svg = render(o);
-  const banned = style === 'ink' ? 'linearGradient|radialGradient' : 'radialGradient';
+  const banned = style === 'ink' || style === 'icon' ?'linearGradient|radialGradient' : 'radialGradient';
   if (new RegExp(`<(script|image|foreignObject|text|filter|pattern|${banned})\\b`, 'i').test(svg) || /fill\s*[:=]\s*["']?(?!none)[#a-z]/i.test(style === 'engrave' ? svg.replace(PAPER_FILL, '') : svg)) {
     errors.push('ink: only strokes drawn by the pen are allowed; no fills, gradients, filters, text or scripts');
   }
@@ -122,7 +125,10 @@ export function check(o) {
 
   const bytes = Buffer.byteLength(svg), kb = (bytes / 1024).toFixed(1);
   if (style === 'ink' && bytes > LIMIT) warnings.push(`size: ${kb} KB is over the 8 KB target; drop detail`);
-  if (style !== 'ink' && bytes > STYLE_LIMIT.fail) errors.push(`size: ${kb} KB is over the 120 KB limit; drop detail`);
+  if (style === 'icon') {
+    if (bytes > 3072) errors.push(`size: ${kb} KB is over the 3 KB limit for an icon; drop detail`);
+    else if (bytes > 1536) warnings.push(`size: ${kb} KB is over the 1.5 KB target for an icon; drop detail`);
+  } else if (style !== 'ink' && bytes > STYLE_LIMIT.fail) errors.push(`size: ${kb} KB is over the 120 KB limit; drop detail`);
   else if (style !== 'ink' && bytes > STYLE_LIMIT.warn) warnings.push(`size: ${kb} KB is over the 60 KB target; drop detail`);
   if (style === 'ink' && !/class="[^"]*\bsl-eye\b/.test(svg)) warnings.push('face: no eyes; leave them out only if a face hurts this drawing');
   if (!/\bACTIVE\b/.test(own)) warnings.push('gesture: nothing happens on hover; give the object its own gesture');
