@@ -6,6 +6,7 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const n = (v) => +v.toFixed(1);
 const delay = (s) => `${+s.toFixed(2)}s`.replace(/^0\./, '.');
 const unit = (v) => v.map((c) => c / Math.hypot(...v));
+const MAX_LINES = 2000;
 const LIGHT = unit([-0.5, -0.6, 0.8]);
 
 /** Part of the line `p + t*d` that lies inside the convex polygon (Cyrus-Beck), or null. */
@@ -30,7 +31,9 @@ function sweep(poly, deg, spacing) {
   const a = (deg * Math.PI) / 180, d = [Math.cos(a), Math.sin(a)], nrm = [-d[1], d[0]];
   const off = poly.map(([x, y]) => x * nrm[0] + y * nrm[1]);
   const segs = [];
-  for (let k = Math.ceil(Math.min(...off) / spacing); k <= Math.floor(Math.max(...off) / spacing); k++) {
+  const [k0, k1] = [Math.ceil(Math.min(...off) / spacing), Math.floor(Math.max(...off) / spacing)];
+  if (!(k1 - k0 <= MAX_LINES)) throw new Error(`hatch spacing ${spacing} would draw more than ${MAX_LINES} lines`);
+  for (let k = k0; k <= k1; k++) {
     const p = [nrm[0] * k * spacing, nrm[1] * k * spacing], t = clip(poly, p, d);
     if (t && t[1] - t[0] > 0.5) segs.push([[p[0] + d[0] * t[0], p[1] + d[1] * t[0]], [p[0] + d[0] * t[1], p[1] + d[1] * t[1]]]);
   }
@@ -38,14 +41,27 @@ function sweep(poly, deg, spacing) {
 }
 
 /** Hatch segments that shade a convex screen polygon: denser with tone, crossed above 0.85. */
-export function hatchLines(poly, { tone = 0.5, angle = 35, spacing = lerp(6, 2.2, tone) } = {}) {
+export function hatchLines(poly, { tone = 0.5, angle = 35, spacing } = {}) {
+  tone = clamp(tone, 0, 1);
+  spacing ??= lerp(6, 2.2, tone);
+  if (!(spacing > 0)) throw new Error(`hatch spacing must be greater than 0, got ${spacing}`);
   return { main: sweep(poly, angle, spacing), cross: tone > 0.85 ? sweep(poly, angle + 90, spacing * 1.5) : [] };
 }
 
+/** Unit normal from the first three corners that are not on one line. */
+function normalOf(points) {
+  for (let i = 0; i < points.length - 2; i++) for (let j = i + 1; j < points.length - 1; j++) for (let k = j + 1; k < points.length; k++) {
+    const [a, b, c] = [points[i], points[j], points[k]];
+    const u = b.map((v, m) => v - a[m]), w = c.map((v, m) => v - b[m]);
+    const cross = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]];
+    if (Math.hypot(...cross) > 1e-9) return unit(cross);
+  }
+  throw new Error('face corners are collinear: a face needs three corners that are not on one line');
+}
+
 /** Tone of a 3D polygon from its normal against the light: 0.15 lit, up to 1 turned away. */
-function toneOf([a, b, c]) {
-  const u = b.map((v, i) => v - a[i]), w = c.map((v, i) => v - b[i]);
-  let nrm = unit([u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]]);
+function toneOf(points) {
+  let nrm = normalOf(points);
   // Face the viewer, so the order the author lists the corners in does not matter.
   if (nrm[0] + nrm[1] + nrm[2] < 0) nrm = nrm.map((v) => -v);
   return clamp(0.5 - 0.5 * nrm.reduce((s, v, i) => s + v * LIGHT[i], 0), 0.15, 1);

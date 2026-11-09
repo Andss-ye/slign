@@ -131,6 +131,29 @@ test('face without tone is darker when turned away from the light', () => {
   assert.ok(hatches(side) > hatches(top));
 });
 
+test('tone outside 0..1 is clamped and still hatches', () => {
+  for (const tone of [5, -3]) {
+    const { main } = hatchLines(SQUARE, { tone });
+    assert.ok(main.length > 5 && main.length < 100, `tone ${tone}`);
+  }
+  assert.deepEqual(hatchLines(SQUARE, { tone: 5 }), hatchLines(SQUARE, { tone: 1 }));
+  assert.deepEqual(hatchLines(SQUARE, { tone: -3 }), hatchLines(SQUARE, { tone: 0 }));
+});
+
+test('hatchLines rejects a spacing that is not positive or would draw an absurd number of lines', () => {
+  for (const spacing of [0, -2, NaN, 1e-9]) assert.throws(() => hatchLines(SQUARE, { spacing }), /spacing/, `spacing ${spacing}`);
+});
+
+test('a face whose first corners are collinear takes its normal from the first real triple', () => {
+  const top = [[0, 0, 20], [30, 0, 20], [30, 30, 20], [0, 30, 20]];
+  const lead = [[0, 0, 20], [15, 0, 20], [30, 0, 20], [30, 30, 20], [0, 30, 20]];
+  const strokes = (pts) => count(render(engrave({ groups: [], draw: (pen) => pen.face(pts) })).match(/class="sl-hatch" d="[^"]*"/)[0], /M/g);
+  assert.ok(strokes(lead) > 0);
+  assert.equal(strokes(lead), strokes(top));
+  const line = [[0, 0, 0], [10, 0, 0], [20, 0, 0]];
+  assert.throws(() => render(engrave({ groups: [], draw: (pen) => pen.face(line) })), /collinear/);
+});
+
 test('stipple draws n dots inside the polygon as one path', () => {
   const svg = render(engrave({ groups: [], draw: (pen) => pen.stipple([[0, 0, 0], [30, 0, 0], [30, 30, 0], [0, 30, 0]], { n: 25 }) }));
   const d = svg.match(/class="sl-dot" d="([^"]+)"/)[1];
