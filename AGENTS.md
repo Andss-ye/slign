@@ -29,7 +29,9 @@ To **use** Slign in another project, read `skills/slign/SKILL.md`.
 - The style is the product. A change that breaks a rule in `SKILL.md` is a bug:
   one ink, no fills, draw only visible edges, show thickness, a face, one
   gesture, only `transform` and `opacity` in motion.
-- Keep `SKILL.md` short. Long material goes in `references/`.
+- Keep `SKILL.md` short: it is loaded every time the skill triggers, and its
+  description in every session. `tests/skill.test.mjs` caps both. Long material
+  goes in `references/`.
 - Everything in this repo is in English.
 - Never commit machine paths, usernames, IP addresses, keys or third-party
   reference art.

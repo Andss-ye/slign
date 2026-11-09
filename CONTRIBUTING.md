@@ -23,7 +23,8 @@ kind of shape or a new kind of gesture. Say which in your pull request.
 2. Run `node build.mjs`. It writes `<name>.svg` and the preview.
 3. Look at it in `preview/index.html`, at rest, hovered, and with the dark toggle.
 4. Run `npm test`.
-5. Add a row for it to the examples table in `skills/slign/SKILL.md`.
+5. Add its name to the example list in `skills/slign/SKILL.md`. A test fails
+   if you forget.
 6. Commit the `.mjs` and the `.svg` together.
 
 Before you open the pull request, check that:
