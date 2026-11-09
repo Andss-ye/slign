@@ -105,6 +105,37 @@ test('the CLI writes its screenshot to the temp dir unless --out says otherwise'
   assert.ok(existsSync(shot));
 });
 
+test('on a dark page the accent is the bright end of the heading gradient, not a dark button', async (t) => {
+  if (!findChrome()) return t.skip('no Chrome');
+  const p = await sense(`<!doctype html><meta charset=utf-8><style>
+body{margin:0;background:#05070f;color:#e8ecf4;font:18px Helvetica,Arial,sans-serif}
+h1{font-size:64px;margin:40px;background:linear-gradient(90deg,#2563eb,#a4f4fd);-webkit-background-clip:text;background-clip:text;color:transparent;display:inline-block}
+a{color:#e8ecf4;margin:0 20px}
+.btn{display:inline-block;margin:40px;padding:12px 24px;background:#0b2551;color:#fff;border-radius:8px}
+</style><h1>Ship faster</h1><p><a href=#>Docs</a><a href=#>Blog</a></p><a class=btn href=#>Pricing</a>`);
+  assert.equal(p.accent, '#a4f4fd');
+  assert.equal(p.ink, '#e8ecf4');
+});
+
+test('ink is the heading color and the accent is never the paper', async (t) => {
+  if (!findChrome()) return t.skip('no Chrome');
+  const p = await sense(`<!doctype html><meta charset=utf-8><style>
+body{margin:0;background:#f4efe1;color:#000;font:18px Helvetica,Arial,sans-serif}
+nav{background:#26241f;padding:12px}nav a{color:#f4efe1;margin:0 14px}
+h1{color:#26241f;font-size:56px;margin:40px}
+.btn{display:inline-block;margin:40px;padding:12px 24px;background:#3DB02C;color:#fff;border-radius:6px}
+</style><nav><a href=#>Menu</a><a href=#>Shop</a><a href=#>Visit</a><a href=#>About</a></nav><h1>Fresh bread</h1><a class=btn href=#>Order</a>`);
+  assert.equal(p.ink, '#26241f');
+  assert.equal(p.accent, '#3db02c');
+});
+
+test('a body set in Space Mono reads as mono even when a wrapper carries the font', async (t) => {
+  if (!findChrome()) return t.skip('no Chrome');
+  const p = await sense(page(`<style>h1{font-family:Georgia,serif}</style><h1>Notes</h1><main style="font-family:'Space Mono',monospace"><p>The quick brown fox jumps over the lazy dog, again and again.</p><p>Second paragraph of plain mono text.</p></main>`));
+  assert.equal(p.type.body, 'mono');
+  assert.equal(p.type.head, 'serif');
+});
+
 test('--out without a path fails before Chrome starts', () => {
   for (const args of [['page.html', '--out'], ['--out', '--other', 'page.html']]) {
     const r = spawnSync(process.execPath, [SENSE, ...args], { encoding: 'utf8', env: { ...process.env, CHROME: '/nonexistent' } });
