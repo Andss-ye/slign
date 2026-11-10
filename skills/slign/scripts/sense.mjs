@@ -1,6 +1,7 @@
 // Reads a page's visual style and prints it as one JSON line: node sense.mjs <url|file.html> [--out profile.png]
 import { realpathSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { findChrome, launch } from './chrome.mjs';
 
@@ -50,7 +51,7 @@ async function inPage() {
   // Accent: the saturated color buttons, links and badges share; else the most vivid color anywhere.
   const saturated = (c) => c[3] > 128 && hsl(c).s >= 0.35 && hsl(c).l > 0.12 && hsl(c).l < 0.92;
   const votes = new Map();
-  const ui = 'button,a,[role=button],[class*=btn],[class*=button],[class*=badge],[class*=pill],[class*=tag],[class*=chip]';
+  const ui = 'button,a,[role=button],.btn,.button,.badge,.tag,.cta';
   for (const { el, cs } of all) {
     if (!el.matches(ui)) continue;
     for (const [color, weight] of [[cs.backgroundColor, 3], [cs.color, 1], [cs.borderTopColor, +(parseFloat(cs.borderTopWidth) > 0)]]) {
@@ -101,13 +102,15 @@ async function inPage() {
     return sides.length ? [Math.max(...sides.map((s) => parseFloat(cs[`border${s}Width`])))] : [];
   }).filter((w) => w > 0));
 
-  // Texture: a wide image makes it a photo; halftoned images show hard pixel-to-pixel jumps.
+  // Texture: a wide image, video or covering background makes it a photo; halftoned images show hard pixel-to-pixel jumps.
   const wide = all.filter((x) => x.r.width > 0.4 * vw);
-  const photo = wide.filter((x) => x.el.tagName === 'IMG').sort((a, b) => b.area - a.area)[0] ?? wide.find((x) => /url\(/.test(x.cs.backgroundImage));
+  const covers = (x) => /url\(/.test(x.cs.backgroundImage) && (/cover|contain/.test(x.cs.backgroundSize) || (x.r.width > 0.4 * vw && x.r.height > 0.4 * vh));
+  const photo = wide.filter((x) => /^(IMG|PICTURE|VIDEO)$/.test(x.el.tagName)).sort((a, b) => b.area - a.area)[0] ?? wide.find(covers);
   let grain;
   if (photo) {
     try {
-      const img = photo.el.tagName === 'IMG' ? photo.el : Object.assign(new Image(), { src: photo.cs.backgroundImage.match(/url\(["']?(.*?)["']?\)/)[1] });
+      const tag = photo.el.tagName;
+      const img = tag === 'IMG' ? photo.el : tag === 'PICTURE' ? photo.el.querySelector('img') : tag === 'VIDEO' ? null : Object.assign(new Image(), { src: photo.cs.backgroundImage.match(/url\(["']?(.*?)["']?\)/)[1] });
       await Promise.race([img.decode(), new Promise((_, no) => setTimeout(no, 3000))]);
       const n = Math.min(256, img.naturalWidth, img.naturalHeight);
       const c = Object.assign(document.createElement('canvas'), { width: n, height: n });
@@ -160,7 +163,11 @@ export const profileOf = (chrome) => chrome.evaluate(`(${inPage})()`);
 
 export async function main(args) {
   const outAt = args.indexOf('--out');
-  const out = outAt >= 0 ? args.splice(outAt, 2)[1] : 'slign-sense.png';
+  const out = outAt >= 0 ? args.splice(outAt, 2)[1] : join(tmpdir(), 'slign-sense.png');
+  if (out === undefined || out.startsWith('--')) {
+    console.error('error    --out needs a path');
+    return 1;
+  }
   const [src] = args;
   if (!src) {
     console.error('usage: node sense.mjs <url|file.html> [--out profile.png]');

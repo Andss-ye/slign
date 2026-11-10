@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -131,6 +131,29 @@ test('face without tone is darker when turned away from the light', () => {
   assert.ok(hatches(side) > hatches(top));
 });
 
+test('tone outside 0..1 is clamped and still hatches', () => {
+  for (const tone of [5, -3]) {
+    const { main } = hatchLines(SQUARE, { tone });
+    assert.ok(main.length > 5 && main.length < 100, `tone ${tone}`);
+  }
+  assert.deepEqual(hatchLines(SQUARE, { tone: 5 }), hatchLines(SQUARE, { tone: 1 }));
+  assert.deepEqual(hatchLines(SQUARE, { tone: -3 }), hatchLines(SQUARE, { tone: 0 }));
+});
+
+test('hatchLines rejects a spacing that is not positive or would draw an absurd number of lines', () => {
+  for (const spacing of [0, -2, NaN, 1e-9]) assert.throws(() => hatchLines(SQUARE, { spacing }), /spacing/, `spacing ${spacing}`);
+});
+
+test('a face whose first corners are collinear takes its normal from the first real triple', () => {
+  const top = [[0, 0, 20], [30, 0, 20], [30, 30, 20], [0, 30, 20]];
+  const lead = [[0, 0, 20], [15, 0, 20], [30, 0, 20], [30, 30, 20], [0, 30, 20]];
+  const strokes = (pts) => count(render(engrave({ groups: [], draw: (pen) => pen.face(pts) })).match(/class="sl-hatch" d="[^"]*"/)[0], /M/g);
+  assert.ok(strokes(lead) > 0);
+  assert.equal(strokes(lead), strokes(top));
+  const line = [[0, 0, 0], [10, 0, 0], [20, 0, 0]];
+  assert.throws(() => render(engrave({ groups: [], draw: (pen) => pen.face(line) })), /collinear/);
+});
+
 test('stipple draws n dots inside the polygon as one path', () => {
   const svg = render(engrave({ groups: [], draw: (pen) => pen.stipple([[0, 0, 0], [30, 0, 0], [30, 30, 0], [0, 30, 0]], { n: 25 }) }));
   const d = svg.match(/class="sl-dot" d="([^"]+)"/)[1];
@@ -227,8 +250,9 @@ test('the sample objects follow the style and stay under the size budget', async
   }
 });
 
-test('the CLI draws the new styles and --swift is ink only', () => {
+test('the CLI draws the new styles and --swift is ink only', (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'slign-styles '));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
   writeFileSync(join(dir, 'wire.mjs'), `export const name = 'wire';\nexport const label = 'Wire';\nexport const style = 'hairline';\nexport const draw = (pen) => pen.line([[0, 0, 0], [20, 0, 0], [20, 20, 0]]);\nexport const css = 'ACTIVE .sl-l{opacity:.5}';\n`);
   const ok = spawnSync('node', [DRAW, 'wire.mjs'], { cwd: dir, encoding: 'utf8' });
   assert.equal(ok.status, 0, ok.stderr);
@@ -236,6 +260,26 @@ test('the CLI draws the new styles and --swift is ink only', () => {
   const swift = spawnSync('node', [DRAW, 'wire.mjs', '--swift'], { cwd: dir, encoding: 'utf8' });
   assert.equal(swift.status, 1);
   assert.match(swift.stderr, /error    --swift supports only the ink style/);
+});
+
+test('a style that is a property of Object.prototype is an error, never a crash', () => {
+  for (const style of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+    const { errors } = check(engrave({ style }));
+    assert.equal(errors.length, 1, style);
+    assert.match(errors[0], /not a style/);
+  }
+  assert.doesNotThrow(() => render(engrave({ style: 'constructor', draw: (pen) => pen.line([[0, 0, 0], [10, 0, 0]]) })));
+});
+
+test('the paper may be any plain CSS color and is checked like the ink', () => {
+  for (const paper of ['#fefdfa', 'rgb(250, 248, 240)', 'hsl(40 30% 96%)', 'oklch(97% .01 90)', 'ivory']) {
+    assert.deepEqual(check(engrave({ palette: { paper } })).errors, [], paper);
+  }
+  const bad = 'red;} .x{fill:url(//e)';
+  for (const [style, palette] of [['engrave', { paper: bad }], ['engrave', { ink: bad }], ['icon', { ink: '#000";onload="x' }], ['hairline', { stops: ['#111', '#eee'], ink: '<b>' }]]) {
+    const { errors } = check({ ...engrave(), style, palette, ...(style === 'icon' ? { draw: (pen) => pen.line([[4, 12], [20, 12]]) } : {}) });
+    assert.deepEqual(errors, ['palette: paper/ink must be a plain CSS color'], style);
+  }
 });
 
 test('an engraved face is filled with the paper so what is behind it stays hidden', () => {

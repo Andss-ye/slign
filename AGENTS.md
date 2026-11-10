@@ -26,9 +26,13 @@ To **use** Slign in another project, read `skills/slign/SKILL.md`.
 - No dependencies. Node only.
 - Example SVGs are generated. Edit the `.mjs`, run `node build.mjs`, commit both.
   A test fails if they drift.
-- The style is the product. A change that breaks a rule in `SKILL.md` is a bug:
-  one ink, no fills, draw only visible edges, show thickness, a face, one
-  gesture, only `transform` and `opacity` in motion.
+- The style is the product. A change that breaks a rule in `SKILL.md` is a bug.
+  `export const style` selects the pen. The default `ink` keeps every rule: one
+  ink, no fills, draw only visible edges, show thickness, a face, one gesture,
+  only `transform` and `opacity` in motion. The other pens follow their own:
+  - `hairline`: thin technical lines; one scoped gradient is allowed.
+  - `engrave`: hatched faces; a paper fill under each face is allowed.
+  - `icon`: 24 grid, flat, no face.
 - Keep `SKILL.md` short: it is loaded every time the skill triggers, and its
   description in every session. `tests/skill.test.mjs` caps both. Long material
   goes in `references/`.

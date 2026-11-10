@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,7 +24,9 @@ test('without a drawing it prints usage and fails', () => {
 });
 
 test('it writes a png when Chrome is installed', (t) => {
-  const out = join(mkdtempSync(join(tmpdir(), 'slign ')), 'rocket.png');
+  const root = mkdtempSync(join(tmpdir(), 'slign '));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const out = join(root, 'rocket.png');
   const r = spawnSync(process.execPath, [SHOT, EXAMPLE, out, '--active'], { encoding: 'utf8' });
   if (/Chrome not found/.test(r.stderr)) return t.skip('no Chrome');
   assert.equal(r.status, 0, r.stderr);

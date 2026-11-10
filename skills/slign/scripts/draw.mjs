@@ -10,12 +10,15 @@ import * as icon from '../pens/icon.mjs';
 
 const LIMIT = 8192;
 // The paper an engraved face is filled with is the one fill allowed.
-const PAPER_FILL = /\.sl-fill\{fill:var\(--slign-paper,#[0-9a-f]{3,8}\);stroke:none\}/i;
+const PLAIN_COLOR = /^[#a-z0-9(),.%\s-]+$/i;
+const PAPER_FILL = /\.sl-fill\{fill:var\(--slign-paper,[#a-z0-9(),.%\s-]+\);stroke:none\}/i;
 const STYLE_LIMIT = { warn: 60 * 1024, fail: 120 * 1024 };
 // The pens beyond hand ink; each exports createPen, finish, paint, baseCss and motionCss.
 // A pen that exports render(o, gesture) draws the whole SVG itself.
 const STYLES = { hairline, engrave, icon };
 const styleOf = (o) => o.style ?? 'ink';
+/** The pen of a non-ink style, or undefined for ink and for names that are not styles. */
+const penOf = (o) => (Object.hasOwn(STYLES, styleOf(o)) ? STYLES[styleOf(o)] : undefined);
 const KEYFRAMES = /@keyframes\s+([\w-]+)\s*\{((?:[^{}]*\{[^{}]*\})*)\s*\}/g;
 const PAD = { top: 14, side: 8, bottom: 6 };
 const SEEDS = [7, 91];
@@ -42,8 +45,8 @@ const BASE =
 
 /** Anchor and canvas size that crop the drawing tightly, keeping room above it for the gesture. */
 function frame(o) {
-  const oy = o.oy ?? 131, xs = [], ys = [];
-  const marks = (STYLES[styleOf(o)] ? [0] : SEEDS).map((s) => o.draw((STYLES[styleOf(o)]?.createPen ?? createPen)(s, oy))).join('');
+  const oy = o.oy ?? 131, xs = [], ys = [], pen = penOf(o);
+  const marks = (pen ? [0] : SEEDS).map((s) => o.draw((pen?.createPen ?? createPen)(s, oy))).join('');
   for (const [, d] of marks.matchAll(/ d="([^"]+)"/g)) {
     const n = d.replace(/h\.01/g, '').match(/-?\d+(\.\d+)?/g)?.map(Number) ?? [];
     for (let i = 0; i + 1 < n.length; i += 2) { xs.push(n[i]); ys.push(n[i + 1]); }
@@ -62,7 +65,7 @@ function frame(o) {
 export function gestureCss(o, f = frame(o)) {
   const origin = (p) => project(p, f.oy, f.ox).map((v) => `${+v.toFixed(1)}px`).join(' ');
   const own = (typeof o.css === 'function' ? o.css({ hinge, origin }) : o.css) ?? '';
-  return own + (STYLES[styleOf(o)]?.motionCss(o) ?? '');
+  return own + (penOf(o)?.motionCss(o) ?? '');
 }
 
 /** The self-contained SVG of a non-ink style: one crisp pass, one paint, its CSS. */
@@ -76,9 +79,10 @@ function renderStyled(o, f, pens) {
 
 /** The self-contained SVG: two passes of the same drawing plus its CSS. */
 export function render(o) {
-  if (STYLES[styleOf(o)]?.render) return STYLES[styleOf(o)].render(o, gestureCss(o, { ox: 0, oy: 0 }));
+  const pen = penOf(o);
+  if (pen?.render) return pen.render(o, gestureCss(o, { ox: 0, oy: 0 }));
   const f = frame(o), root = `.slign-${o.name}`;
-  if (STYLES[styleOf(o)]) return renderStyled(o, f, STYLES[styleOf(o)]);
+  if (pen) return renderStyled(o, f, pen);
   const css = BASE + gestureCss(o, f).replace(/\bACTIVE\b/g, active(root)).replace(/\bROOT\b/g, root);
   const pass = (cls, seed) => `<g class="${cls}">${o.draw(createPen(seed, f.oy, f.ox))}</g>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${f.w} ${f.h}" class="slign slign-${o.name}" role="img" aria-label="${o.label}" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">` +
@@ -91,7 +95,11 @@ export function check(o) {
   if (!/^[a-z][a-z0-9-]*$/.test(o.name ?? '')) errors.push('name: export a kebab-case `name`, for example "router"');
   if (!o.label) errors.push('label: export a human-readable `label`; it becomes the aria-label');
   if (typeof o.draw !== 'function') errors.push('draw: export a `draw(pen)` function that returns the markup');
-  if (!['ink', ...Object.keys(STYLES)].includes(styleOf(o))) errors.push(`style: "${o.style}" is not a style; use ink, hairline, engrave or icon`);
+  if (styleOf(o) !== 'ink' && !penOf(o)) errors.push(`style: "${o.style}" is not a style; use ink, hairline, engrave or icon`);
+  if (styleOf(o) !== 'ink') {
+    const plain = (v) => v === undefined || (typeof v === 'string' && PLAIN_COLOR.test(v));
+    if (!plain(o.palette?.paper) || !plain(o.palette?.ink)) errors.push('palette: paper/ink must be a plain CSS color');
+  }
   if (errors.length) return { errors, warnings };
 
   const style = styleOf(o), own = gestureCss(o), svg = render(o);
