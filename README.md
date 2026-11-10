@@ -1,5 +1,12 @@
 # Slign
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/hero-dark.svg">
+    <img src="docs/img/hero-light.svg" alt="Slign illustrations: a bell, cloud, database, laptop, phone, rocket, server and terminal in hand ink, a glass cube in hairline and a box in engraving" width="100%">
+  </picture>
+</p>
+
 Teach your coding agent to draw. Slign is a skill for hand-inked isometric
 illustrations that come alive on hover: one ink, a little face, no fills, no
 JavaScript.
@@ -9,12 +16,30 @@ product's own thing in this style, sizes it to the text around it, and places
 it in the page as one self-contained SVG.
 
 <p>
-  <img src="skills/slign/examples/laptop.svg" width="120" alt="Laptop">
-  <img src="skills/slign/examples/server.svg" width="100" alt="Server">
-  <img src="skills/slign/examples/database.svg" width="80" alt="Database">
-  <img src="skills/slign/examples/cloud.svg" width="100" alt="Cloud">
-  <img src="skills/slign/examples/terminal.svg" width="100" alt="Terminal">
-  <img src="skills/slign/examples/rocket.svg" width="80" alt="Rocket">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/laptop-dark.svg">
+    <img src="docs/img/laptop-light.svg" width="120" alt="Laptop">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/server-dark.svg">
+    <img src="docs/img/server-light.svg" width="100" alt="Server">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/database-dark.svg">
+    <img src="docs/img/database-light.svg" width="80" alt="Database">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/cloud-dark.svg">
+    <img src="docs/img/cloud-light.svg" width="100" alt="Cloud">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/terminal-dark.svg">
+    <img src="docs/img/terminal-light.svg" width="100" alt="Terminal">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/rocket-dark.svg">
+    <img src="docs/img/rocket-light.svg" width="80" alt="Rocket">
+  </picture>
 </p>
 
 ## Install
@@ -72,6 +97,10 @@ when that element is hovered, focused or tapped.
 - Motion is CSS only, limited to `transform` and `opacity`, and switches off
   under `prefers-reduced-motion`.
 - Safe to put many on one page: no ids, every class and keyframe is scoped.
+
+Three styles, picked with `style` in the object file: `ink` (the default, above),
+`hairline` (precise thin lines with a gradient) and `engrave` (hatching and
+stipple on paper).
 
 The reference objects live in [`skills/slign/examples`](skills/slign/examples).
 
