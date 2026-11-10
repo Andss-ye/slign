@@ -46,31 +46,57 @@ async function inPage() {
   const page = [document.body, document.documentElement].map((e) => bg(getComputedStyle(e))).find((c) => c[3] > 0);
   const biggest = all.filter((x) => bg(x.cs)[3] > 128).sort((a, b) => b.area - a.area)[0];
   const paper = page ?? (biggest ? bg(biggest.cs) : [255, 255, 255, 255]);
-  const ink = rgba(getComputedStyle(document.body).color);
+  const lum = (c) => {
+    const [r, g, b] = c.map((v) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const contrast = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
 
-  // Accent: the saturated color buttons, links and badges share; else the most vivid color anywhere.
+  // Ink: the first h1 (else h2) painted in a solid color, else the body text.
+  const solid = (sel) => {
+    const el = document.querySelector(sel);
+    const c = el && rgba(getComputedStyle(el).color);
+    return c?.[3] > 128 ? c : null;
+  };
+  const ink = solid('h1') ?? solid('h2') ?? rgba(getComputedStyle(document.body).color);
+
+  // Accent: a saturated color that reads on the paper (3:1, else 1.5:1). It comes from a heading
+  // gradient, else from the colored text and borders of links and badges, else from filled buttons.
   const saturated = (c) => c[3] > 128 && hsl(c).s >= 0.35 && hsl(c).l > 0.12 && hsl(c).l < 0.92;
-  const votes = new Map();
   const ui = 'button,a,[role=button],.btn,.button,.badge,.tag,.cta';
-  for (const { el, cs } of all) {
-    if (!el.matches(ui)) continue;
-    for (const [color, weight] of [[cs.backgroundColor, 3], [cs.color, 1], [cs.borderTopColor, +(parseFloat(cs.borderTopWidth) > 0)]]) {
-      const c = rgba(color);
-      if (weight && saturated(c)) votes.set(hex(c), (votes.get(hex(c)) ?? 0) + weight);
-    }
-  }
-  let accent = [...votes].sort((a, b) => b[1] - a[1] || hsl(rgba(b[0])).s - hsl(rgba(a[0])).s)[0]?.[0];
-  if (!accent) {
-    const seen = all.flatMap(({ cs }) => [cs.color, cs.backgroundColor, cs.borderTopColor].map(rgba)).filter(saturated);
-    accent = hex(seen.sort((a, b) => hsl(b).chroma - hsl(a).chroma)[0] ?? ink);
-  }
-
-  // Gradient: stops of gradient-filled text, else of a large element's linear gradient.
+  const clipText = (cs) => (cs.webkitBackgroundClip || cs.backgroundClip) === 'text';
   const stops = (img) => {
     const out = (img.match(/(?:rgba?|hsla?|oklch|oklab|lab|lch|color)\([^)]*\)|#[0-9a-f]{3,8}/gi) ?? []).map(rgba).filter((c) => c[3] > 0).map(hex);
     return out.filter((c, i) => c !== out[i - 1]).slice(0, 4);
   };
-  const clipText = (cs) => (cs.webkitBackgroundClip || cs.backgroundClip) === 'text';
+  const textFills = all.filter((x) => clipText(x.cs) && x.cs.backgroundImage.includes('gradient')).map((x) => stops(x.cs.backgroundImage)).filter((s) => s.length > 1);
+  const voteFor = (pick) => {
+    const votes = new Map();
+    for (const { el, cs } of all) {
+      if (!el.matches(ui)) continue;
+      for (const [color, weight] of pick(cs)) {
+        const c = rgba(color);
+        if (weight && saturated(c)) votes.set(hex(c), (votes.get(hex(c)) ?? 0) + weight);
+      }
+    }
+    return votes;
+  };
+  const texts = voteFor((cs) => [[cs.color, 1], [cs.borderTopColor, +(parseFloat(cs.borderTopWidth) > 0)]]);
+  const fillsVotes = voteFor((cs) => [[cs.backgroundColor, 1]]);
+  const readable = (min) => (c) => saturated(rgba(c)) && contrast(rgba(c), paper) >= min;
+  const top = (votes, min) => [...votes.keys()].filter(readable(min)).sort((a, b) => votes.get(b) - votes.get(a) || hsl(rgba(b)).s - hsl(rgba(a)).s)[0];
+  let accent;
+  for (const min of [3, 1.5]) {
+    const glow = textFills.flat().filter(readable(min)).sort((a, b) => contrast(rgba(b), paper) - contrast(rgba(a), paper))[0];
+    accent = glow ?? top(texts, min) ?? top(fillsVotes, min);
+    if (accent) break;
+  }
+  if (!accent) {
+    const seen = all.flatMap(({ cs }) => [cs.color, cs.backgroundColor, cs.borderTopColor].map(rgba)).filter((c) => saturated(c) && contrast(c, paper) >= 1.5);
+    accent = hex(seen.sort((a, b) => hsl(b).chroma - hsl(a).chroma)[0] ?? ink);
+  }
+
+  // Gradient: stops of gradient-filled text, else of a large element's linear gradient.
   const fills = [
     ...all.filter((x) => clipText(x.cs) && x.cs.backgroundImage.includes('gradient')),
     ...all.filter((x) => x.area > 0.3 * vw * vh && x.cs.backgroundImage.includes('linear-gradient')),
@@ -79,7 +105,7 @@ async function inPage() {
 
   // Type: the first recognised family in the stack decides.
   const SERIF = /georgia|times|garamond|playfair|cormorant|lora|merriweather|source serif|palatino|baskerville|bodoni|didot|cambria|fraunces|crimson|spectral|newsreader|tiempos|canela|noto serif|pt serif|dm serif|instrument serif|\bserif\b/;
-  const MONO = /mono|courier|menlo|consolas|jetbrains|fira code|source code|monaco|ui-monospace/;
+  const MONO = /mono|courier|menlo|consolas|jetbrains|fira code|source code|monaco/;
   const kind = (stack) => {
     for (const f of stack.toLowerCase().split(',').map((s) => s.trim().replace(/^["']|["']$/g, ''))) {
       if (MONO.test(f)) return 'mono';
@@ -89,7 +115,7 @@ async function inPage() {
     return 'sans';
   };
   const heading = document.querySelector('h1,h2') ?? document.body;
-  const type = { head: kind(getComputedStyle(heading).fontFamily), body: kind(getComputedStyle(document.body).fontFamily) };
+  const chars = {};
 
   // Shape: corner radius of buttons and cards, thickness of drawn borders.
   const shaped = all.filter((x) => x.el.matches('button,[role=button],[class*=btn],[class*=button],[class*=card],[class*=badge],[class*=pill],article'));
@@ -135,6 +161,7 @@ async function inPage() {
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
     const cs = n.parentElement && getComputedStyle(n.parentElement);
     if (!n.nodeValue.trim() || !cs || cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0' || /^(SCRIPT|STYLE|NOSCRIPT)$/.test(n.parentElement.tagName)) continue;
+    if (!n.parentElement.closest('h1,h2,h3,h4,h5,h6')) chars[kind(cs.fontFamily)] = (chars[kind(cs.fontFamily)] ?? 0) + n.nodeValue.trim().length;
     const range = document.createRange();
     range.selectNodeContents(n);
     for (const r of range.getClientRects()) {
@@ -142,6 +169,8 @@ async function inPage() {
     }
   }
   const share = text / (vw * vh);
+  // Body type is the family most of the running text is set in, wherever the page declares it.
+  const type = { head: kind(getComputedStyle(heading).fontFamily), body: Object.entries(chars).sort((a, b) => b[1] - a[1])[0]?.[0] ?? kind(getComputedStyle(document.body).fontFamily) };
 
   return {
     theme: 0.299 * paper[0] + 0.587 * paper[1] + 0.114 * paper[2] < 128 ? 'dark' : 'light',

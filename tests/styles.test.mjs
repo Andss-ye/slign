@@ -59,13 +59,14 @@ test('every hairline path is drawn twice: a faint wide glow under the crisp line
   assert.ok(crisp > 0);
   assert.equal(count(svg, /<g class="sl-glow">/g), 2);
   assert.equal(count(svg, /<path d="/g), crisp);
-  assert.ok(svg.includes('.sl-glow{opacity:.12}') && svg.includes('.sl-glow path{stroke-width:calc(var(--_w)*4)}'));
+  assert.ok(svg.includes('.sl-glow{opacity:var(--slign-glow-opacity,.12)}') && svg.includes('stroke-width:var(--slign-glow,3.6)'));
 });
 
-test('hairline straight segments stay straight and rings are polylines', () => {
+test('hairline straight segments stay straight and rings are splines', () => {
   const svg = render(hairline());
-  const lines = [...svg.matchAll(/class="sl-l" d="([^"]+)"/g)].map((m) => m[1]);
-  assert.ok(lines.every((d) => /^M[\d. -]+(L[\d. -]+)+Z?$/.test(d)), lines.join('\n'));
+  const lines = [...svg.matchAll(/class="sl-l" d="([^"]+)"/g)].map((m) => m[1]).filter((d) => !d.includes('Q'));
+  assert.ok(lines.length > 0 && lines.every((d) => /^M[\d. -]+(L[\d. -]+)+Z?$/.test(d)), lines.join('\n'));
+  assert.ok(/class="sl-l" d="M[\d. -]+(Q[\d. -]+){12}"/.test(svg));
 });
 
 test('an engrave render is one ink with hatch lines and an outline per face', () => {
@@ -241,7 +242,7 @@ test('the size budget is 60 KB to warn and 120 KB to fail for the new styles', (
 });
 
 test('the sample objects follow the style and stay under the size budget', async () => {
-  for (const file of ['hairline-cube', 'engrave-cube']) {
+  for (const file of ['hairline-cube', 'hairline-stack', 'engrave-cube']) {
     const o = await import(`../skills/slign/pens/samples/${file}.mjs`);
     const { errors, warnings, svg } = check(o);
     assert.deepEqual(errors, [], file);

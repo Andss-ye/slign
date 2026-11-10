@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Keeps a project's drawings in order: node lib.mjs <init|add|list|place|build> [args]
+// Keeps a project's drawings in order: node lib.mjs <init|add|remove|rename|list|place|build> [args]
 import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -11,10 +11,13 @@ import { profileOf } from './sense.mjs';
 const USAGE = `usage: node lib.mjs <command> [--dir slign]
   init [--url <page|file.html>] [--format jsx|swift] [--force]
   add <object.mjs> [--kind icon|illustration|component] [--force]
+  remove <name> [--kind icon|illustration|component]
+  rename <old> <new>
   list [--json]
   place <name> --into <page>
   build`;
-const BUDGET = { icon: 1536, illustration: 12288, component: 12288 };
+const BUDGET = { icon: 700, illustration: 12288, component: 12288 };
+const ICON_TARGET = 520;
 const VALUE_FLAGS = new Set(['--url', '--dir', '--kind', '--into', '--format']);
 const README = `# Slign library
 Drawings for this project, kept in order: icons, illustrations and components.
@@ -35,9 +38,9 @@ const fail = (message) => {
   throw new Fail(message);
 };
 
-/** Style that suits the page: dark with a gradient draws hairline, light with serif heads engraves. */
-export const styleFor = ({ theme, gradient, type }) =>
-  theme === 'dark' && gradient?.length ? 'hairline' : theme === 'light' && type?.head === 'serif' ? 'engrave' : 'ink';
+/** Style that suits the page: dark is hairline, light with serif heads engraves, a mono body is hand-drawn ink, any other light page is hairline. */
+export const styleFor = ({ theme, type }) =>
+  theme === 'dark' ? 'hairline' : type?.head === 'serif' ? 'engrave' : type?.body === 'mono' ? 'ink' : 'hairline';
 
 const parse = (args) => {
   const flags = {}, rest = [];
@@ -102,6 +105,7 @@ function make(mod, config, kind) {
   for (const w of warnings) console.error(`warning  ${w}`);
   if (errors.length) throw new Fail(...errors);
   const bytes = Buffer.byteLength(svg), budget = config.budget[kind];
+  if (kind === 'icon' && bytes > ICON_TARGET && bytes <= budget) console.error(`warn    ${o.name} is ${bytes} bytes, over the ${ICON_TARGET} target`);
   if (bytes > budget) fail(`${o.name} is ${bytes} bytes, over the ${budget} byte budget for ${kind}s: drop detail or raise budget.${kind} in slign.config.json`);
   return { o, svg, bytes, files: outputs(o, svg, kind, config) };
 }
@@ -163,6 +167,51 @@ async function add({ flags, rest }) {
   console.log(`${o.name}  ${kind}  ${bytes} bytes`);
 }
 
+/** The library item called `name`, or a failure; `kind` narrows it when given. */
+function find(index, name, kind) {
+  const item = index.items.find((i) => i.name === name);
+  if (!item) fail(`${name} is not in the library: node lib.mjs list shows what is`);
+  if (kind && item.kind !== kind) fail(`${name} is an ${item.kind}, not an ${kind}`);
+  return item;
+}
+
+/** Deletes the generated files of an item and, with `src`, its source. */
+const unlink = (dir, item, src) => {
+  for (const ext of ['svg', 'jsx', 'swift']) rmSync(join(dir, item.file.replace(/\.svg$/, `.${ext}`)), { force: true });
+  if (src) rmSync(join(dir, `src/${item.name}.mjs`), { force: true });
+};
+
+function remove({ flags, rest }) {
+  const [name] = rest, dir = flags.dir ?? 'slign';
+  if (!name) fail('remove needs a name: node lib.mjs remove <name>');
+  const { index } = open(dir), item = find(index, name, flags.kind);
+  unlink(dir, item, true);
+  write(dir, 'index.json', json({ ...index, items: index.items.filter((i) => i !== item) }));
+  console.log(`removed  ${name}`);
+}
+
+async function rename({ flags, rest }) {
+  const [from, to] = rest, dir = flags.dir ?? 'slign';
+  if (!from || !to) fail('rename needs two names: node lib.mjs rename <old> <new>');
+  const { config, index } = open(dir), item = find(index, from);
+  if (index.items.some((i) => i.name === to)) fail(`${to} is already in the library`);
+  const text = readFileSync(join(dir, `src/${from}.mjs`), 'utf8')
+    .replace(/(export const name\s*=\s*)(['"`])[^'"`]*\2/, `$1'${to}'`)
+    .replaceAll(`slign-${from}-`, `slign-${to}-`);
+  const file = write(dir, `src/${to}.mjs`, text);
+  try {
+    const { o, svg, bytes, files } = make(await load(file), config, item.kind);
+    unlink(dir, item, true);
+    for (const [rel, body] of Object.entries(files)) write(dir, rel, body);
+    const items = [...index.items.filter((i) => i !== item), entry(o, item.kind, svg, bytes, item.added)].sort(byKindThenName);
+    write(dir, 'index.json', json({ ...index, items }));
+  } catch (e) {
+    rmSync(file, { force: true });
+    throw e;
+  }
+  console.log(`renamed  ${from} -> ${to}`);
+}
+
 function list({ flags }) {
   const { index } = open(flags.dir ?? 'slign');
   if (flags.json) return console.log(JSON.stringify(index.items, null, 2));
@@ -201,7 +250,7 @@ async function build({ flags }) {
   process.exitCode = 1;
 }
 
-const COMMANDS = { init, add, list, place, build };
+const COMMANDS = { init, add, remove, rename, list, place, build };
 
 export async function main(args) {
   try {
@@ -210,8 +259,8 @@ export async function main(args) {
       console.log(USAGE);
       return 0;
     }
-    if (!cmd) fail('no command: use init, add, list, place or build (--help shows the options)');
-    if (!COMMANDS[cmd]) fail(`unknown command "${cmd}": use init, add, list, place or build`);
+    if (!cmd) fail('no command: use init, add, remove, rename, list, place or build (--help shows the options)');
+    if (!COMMANDS[cmd]) fail(`unknown command "${cmd}": use init, add, remove, rename, list, place or build`);
     process.exitCode = 0;
     await COMMANDS[cmd](parse(more));
     return process.exitCode;

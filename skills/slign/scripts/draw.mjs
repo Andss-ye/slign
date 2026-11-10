@@ -9,7 +9,7 @@ import * as hairline from '../pens/hairline.mjs';
 import * as icon from '../pens/icon.mjs';
 
 const LIMIT = 8192;
-// The paper an engraved face is filled with is the one fill allowed.
+// The paper an engraved or hairline face is filled with is the one fill allowed.
 const PLAIN_COLOR = /^[#a-z0-9(),.%\s-]+$/i;
 const PAPER_FILL = /\.sl-fill\{fill:var\(--slign-paper,[#a-z0-9(),.%\s-]+\);stroke:none\}/i;
 const STYLE_LIMIT = { warn: 60 * 1024, fail: 120 * 1024 };
@@ -104,7 +104,7 @@ export function check(o) {
 
   const style = styleOf(o), own = gestureCss(o), svg = render(o);
   const banned = style === 'ink' || style === 'icon' ?'linearGradient|radialGradient' : 'radialGradient';
-  if (new RegExp(`<(script|image|foreignObject|text|filter|pattern|${banned})\\b`, 'i').test(svg) || /fill\s*[:=]\s*["']?(?!none)[#a-z]/i.test(style === 'engrave' ? svg.replace(PAPER_FILL, '') : svg)) {
+  if (new RegExp(`<(script|image|foreignObject|text|filter|pattern|${banned})\\b`, 'i').test(svg) || /fill\s*[:=]\s*["']?(?!none)[#a-z]/i.test(style === 'engrave' || style === 'hairline' ? svg.replace(PAPER_FILL, '') : svg)) {
     errors.push('ink: only strokes drawn by the pen are allowed; no fills, gradients, filters, text or scripts');
   }
   if (style !== 'ink') {

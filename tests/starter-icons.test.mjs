@@ -12,14 +12,14 @@ test('the twelve starter icons exist', () => {
 });
 
 for (const file of files) {
-  test(`${file} is a clean icon under 700 bytes with its committed svg`, async () => {
+  test(`${file} is a clean icon under 670 bytes with its committed svg`, async () => {
     const o = await import(new URL(file, dir));
     const { errors, warnings, svg } = check(o);
     assert.deepEqual(errors, []);
     assert.deepEqual(warnings, []);
     assert.equal(o.style, 'icon');
     assert.equal(file, `${o.name}.mjs`);
-    assert.ok(Buffer.byteLength(svg) <= 700, `${Buffer.byteLength(svg)} bytes`);
+    assert.ok(Buffer.byteLength(svg) <= 670, `${Buffer.byteLength(svg)} bytes`);
     assert.equal(readFileSync(new URL(`${o.name}.svg`, dir), 'utf8'), svg + '\n');
   });
 }

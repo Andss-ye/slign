@@ -1,11 +1,10 @@
 import { project } from '../scripts/pen.mjs';
-import { LAYOUT, createPen as createLinePen } from './hairline.mjs';
+import { LAYOUT, createPen as createLinePen, normalOf, unit } from './hairline.mjs';
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const n = (v) => +v.toFixed(1);
 const delay = (s) => `${+s.toFixed(2)}s`.replace(/^0\./, '.');
-const unit = (v) => v.map((c) => c / Math.hypot(...v));
 const MAX_LINES = 2000;
 const LIGHT = unit([-0.5, -0.6, 0.8]);
 
@@ -46,17 +45,6 @@ export function hatchLines(poly, { tone = 0.5, angle = 35, spacing } = {}) {
   spacing ??= lerp(6, 2.2, tone);
   if (!(spacing > 0)) throw new Error(`hatch spacing must be greater than 0, got ${spacing}`);
   return { main: sweep(poly, angle, spacing), cross: tone > 0.85 ? sweep(poly, angle + 90, spacing * 1.5) : [] };
-}
-
-/** Unit normal from the first three corners that are not on one line. */
-function normalOf(points) {
-  for (let i = 0; i < points.length - 2; i++) for (let j = i + 1; j < points.length - 1; j++) for (let k = j + 1; k < points.length; k++) {
-    const [a, b, c] = [points[i], points[j], points[k]];
-    const u = b.map((v, m) => v - a[m]), w = c.map((v, m) => v - b[m]);
-    const cross = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]];
-    if (Math.hypot(...cross) > 1e-9) return unit(cross);
-  }
-  throw new Error('face corners are collinear: a face needs three corners that are not on one line');
 }
 
 /** Tone of a 3D polygon from its normal against the light: 0.15 lit, up to 1 turned away. */
