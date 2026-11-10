@@ -5,7 +5,6 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { check } from './skills/slign/scripts/draw.mjs';
 
-const dir = new URL('skills/slign/examples/', import.meta.url);
 const samples = new URL('skills/slign/pens/samples/', import.meta.url);
 const argv = process.argv.slice(2);
 const readme = argv.includes('--readme');
@@ -60,20 +59,24 @@ function hero(theme, rows) {
     place(rows[0], 22, 140, 22) + place(rows[1], 190, 200, 110) + '</svg>';
 }
 
-for (const file of readdirSync(dir).filter((f) => f.endsWith('.mjs')).sort()) {
-  const o = await import(new URL(file, dir));
-  const { errors, warnings, svg } = check(o);
-  for (const w of warnings) console.error(`${file}  warning  ${w}`);
-  if (errors.length) {
-    console.error(`${file}\n  ${errors.join('\n  ')}`);
-    process.exit(1);
+// Icons share names with illustrations (bell), so only the illustrations go in the preview.
+for (const [folder, preview] of [['skills/slign/examples/', true], ['skills/slign/examples/icons/', false]]) {
+  const dir = new URL(folder, import.meta.url);
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.mjs')).sort()) {
+    const o = await import(new URL(file, dir));
+    const { errors, warnings, svg } = check(o);
+    for (const w of warnings) console.error(`${file}  warning  ${w}`);
+    if (errors.length) {
+      console.error(`${file}\n  ${errors.join('\n  ')}`);
+      process.exit(1);
+    }
+    if (preview) inks.push(svg);
+    if (readme) continue;
+    writeFileSync(new URL(`${o.name}.svg`, dir), svg + '\n');
+    const kb = (Buffer.byteLength(svg) / 1024).toFixed(1);
+    if (preview) figures.push(`<figure>${svg}<figcaption>${o.name} · ${kb} KB</figcaption></figure>`);
+    console.log(`${o.name}  ${kb} KB`);
   }
-  inks.push(svg);
-  if (readme) continue;
-  writeFileSync(new URL(`${o.name}.svg`, dir), svg + '\n');
-  const kb = (Buffer.byteLength(svg) / 1024).toFixed(1);
-  figures.push(`<figure>${svg}<figcaption>${o.name} · ${kb} KB</figcaption></figure>`);
-  console.log(`${o.name}  ${kb} KB`);
 }
 
 if (readme) {
